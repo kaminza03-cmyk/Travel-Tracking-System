@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Travel Tracking System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0f172a; --navy-soft:#1e293b; --amber:#f59e0b; --amber-dark:#d97706;
+    --slate-100:#f1f5f9; --slate-200:#e2e8f0; --slate-300:#cbd5e1; --slate-400:#94a3b8;
+    --slate-500:#64748b; --slate-700:#334155; --slate-800:#1e293b;
+    --emerald:#059669; --rose:#e11d48;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--slate-100); color:var(--slate-800);
+    font-family:'Inter', system-ui, sans-serif; -webkit-font-smoothing:antialiased;
+    padding-bottom:40px;
+  }
+  .font-display{font-family:'Oswald', sans-serif;}
+  .font-mono{font-family:'IBM Plex Mono', monospace;}
+
+  header{
+    background:var(--navy); color:#fff; padding:20px 16px 16px;
+    position:sticky; top:0; z-index:20; box-shadow:0 4px 14px rgba(0,0,0,.25);
+  }
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand-badge{background:var(--amber); border-radius:8px; padding:7px; display:flex;}
+  .brand h1{font-size:18px; margin:0; letter-spacing:.03em; text-transform:uppercase;}
+  .brand p{margin:0; font-size:11px; color:var(--slate-400);}
+
+  .tabs{display:flex; margin-top:16px; background:var(--navy-soft); border-radius:10px; padding:4px; gap:4px;}
+  .tab-btn{
+    flex:1; display:flex; align-items:center; justify-content:center; gap:6px;
+    padding:9px 0; border:none; border-radius:8px; font-size:14px; font-weight:600;
+    background:transparent; color:var(--slate-300); cursor:pointer; font-family:inherit;
+  }
+  .tab-btn.active{background:var(--amber); color:var(--navy);}
+
+  main{max-width:520px; margin:0 auto; padding:20px 16px 0;}
+  section.card{background:#fff; border:1px solid var(--slate-200); border-radius:14px; padding:16px; margin-bottom:20px;}
+  .sec-head{display:flex; align-items:center; gap:8px; margin-bottom:14px;}
+  .sec-num{font-family:'Oswald',sans-serif; font-size:12px; background:var(--navy); color:var(--amber); border-radius:6px; padding:4px 8px;}
+  .sec-title{font-family:'Oswald',sans-serif; font-size:14px; text-transform:uppercase; letter-spacing:.03em; color:var(--slate-700);}
+
+  .field{margin-bottom:12px;}
+  .field label{
+    display:flex; align-items:center; gap:5px; font-size:11px; font-weight:600;
+    color:var(--slate-500); text-transform:uppercase; letter-spacing:.03em; margin-bottom:6px;
+  }
+  .field input, .field select{
+    width:100%; border:1px solid var(--slate-300); border-radius:8px; padding:10px 12px;
+    font-size:15px; color:var(--slate-800); font-family:inherit; background:#fff;
+  }
+  .field input:focus, .field select:focus{outline:none; border-color:var(--amber); box-shadow:0 0 0 3px rgba(245,158,11,.25);}
+  .field input[disabled]{background:var(--slate-100); color:var(--slate-500);}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+
+  .photo-row{display:flex; gap:12px;}
+  .photo-slot{flex:1; min-width:0; border:1px solid var(--slate-200); border-radius:10px; overflow:hidden; background:#fff;}
+  .photo-tag{display:flex; align-items:center; gap:6px; padding:8px 10px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:#fff;}
+  .photo-tag.go{background:var(--slate-700);}
+  .photo-tag.back{background:var(--amber-dark);}
+  .photo-drop{
+    position:relative; aspect-ratio:4/3; width:100%; background:var(--slate-100);
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .photo-drop img{width:100%; height:100%; object-fit:cover;}
+  .photo-placeholder{display:flex; flex-direction:column; align-items:center; gap:6px; color:var(--slate-400); font-size:11px; font-weight:500; text-align:center; padding:8px;}
+  .photo-remove{
+    position:absolute; top:6px; right:6px; background:rgba(0,0,0,.6); color:#fff;
+    border:none; border-radius:999px; width:22px; height:22px; display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .dist-wrap{display:flex; align-items:center; gap:6px; padding:9px 10px; margin:10px; border:1px solid var(--slate-300); border-radius:8px;}
+  .dist-wrap input{border:none; outline:none; width:100%; font-size:15px; font-family:inherit; background:transparent;}
+  .dist-wrap span{font-size:11px; color:var(--slate-400); font-family:'IBM Plex Mono',monospace; white-space:nowrap;}
+
+  .btn{
+    display:flex; align-items:center; justify-content:center; gap:8px; width:100%;
+    padding:14px; border-radius:12px; font-size:14px; font-weight:600; cursor:pointer;
+    font-family:inherit; border:none;
+  }
+  .btn:active{transform:scale(.98);}
+  .btn-primary{background:var(--navy); color:#fff; margin-bottom:12px;}
+  .btn-outline{background:#fff; color:var(--navy); border:2px solid var(--navy); margin-bottom:28px;}
+  .btn-primary:disabled{opacity:.6;}
+
+  .hist-topbar{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;}
+  .hist-topbar p{font-size:12px; color:var(--slate-500); margin:0;}
+  .btn-mini{display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; background:var(--navy); color:#fff; border:none; border-radius:8px; padding:7px 12px; cursor:pointer; font-family:inherit;}
+
+  .entry-card{background:#fff; border:1px solid var(--slate-200); border-radius:14px; padding:14px; margin-bottom:12px;}
+  .entry-top{display:flex; align-items:flex-start; justify-content:space-between; gap:8px;}
+  .entry-title{font-family:'Oswald',sans-serif; font-size:14px; text-transform:uppercase; letter-spacing:.02em; color:var(--slate-800); margin:0;}
+  .entry-date{font-size:11px; color:var(--slate-400); font-family:'IBM Plex Mono',monospace; margin:2px 0 0;}
+  .del-btn{background:none; border:none; color:var(--rose); cursor:pointer; padding:4px; font-size:15px;}
+  .entry-meta{display:grid; grid-template-columns:1fr 1fr; gap:4px 12px; font-size:12px; color:var(--slate-600); margin-top:8px;}
+  .entry-imgs{display:flex; gap:8px; margin-top:10px;}
+  .entry-imgs img{width:50%; aspect-ratio:4/3; object-fit:cover; border-radius:8px; border:1px solid var(--slate-200); cursor:zoom-in;}
+  .entry-imgs .img-slot{width:50%; position:relative;}
+  .entry-imgs .img-cap{position:absolute; bottom:0; left:0; right:0; background:rgba(15,23,42,.65); color:#fff; font-size:10px; font-weight:600; text-align:center; padding:3px 0; border-radius:0 0 8px 8px; pointer-events:none;}
+  .empty-state{text-align:center; padding:60px 0; color:var(--slate-400); font-size:14px;}
+  .entry-actions{display:flex; gap:8px; margin-top:10px;}
+  .btn-pdf{flex:1; display:flex; align-items:center; justify-content:center; gap:6px; font-size:12px; font-weight:600; background:var(--rose); color:#fff; border:none; border-radius:8px; padding:8px 10px; cursor:pointer; font-family:inherit;}
+  .btn-pdf-outline{flex:1; display:flex; align-items:center; justify-content:center; gap:6px; font-size:12px; font-weight:600; background:#fff; color:var(--rose); border:1.5px solid var(--rose); border-radius:8px; padding:8px 10px; cursor:pointer; font-family:inherit; margin-bottom:12px;}
+
+  /* ---- Image lightbox viewer ---- */
+  .viewer-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:80;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px;
+  }
+  .viewer-topbar{position:absolute; top:14px; right:14px; display:flex; gap:10px; z-index:2;}
+  .viewer-btn{
+    background:rgba(255,255,255,.15); color:#fff; border:none; border-radius:8px;
+    width:38px; height:38px; display:flex; align-items:center; justify-content:center;
+    font-size:16px; cursor:pointer;
+  }
+  .viewer-img-wrap{max-width:100%; max-height:80vh; display:flex; align-items:center; justify-content:center;}
+  .viewer-img-wrap img{max-width:100%; max-height:80vh; object-fit:contain; border-radius:6px;}
+  .viewer-download{
+    margin-top:16px; display:flex; align-items:center; gap:8px; background:var(--amber); color:var(--navy);
+    border:none; border-radius:10px; padding:12px 22px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit;
+  }
+
+  .toast{
+    position:fixed; top:14px; left:50%; transform:translateX(-50%); z-index:50;
+    display:flex; align-items:center; gap:8px; padding:11px 18px; border-radius:10px;
+    font-size:14px; font-weight:500; color:#fff; box-shadow:0 6px 20px rgba(0,0,0,.2);
+  }
+  .toast.ok{background:var(--emerald);}
+  .toast.err{background:var(--rose);}
+  .hidden{display:none !important;}
+
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:60;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .modal-box{
+    background:#fff; border-radius:14px; padding:22px 20px; max-width:340px; width:100%;
+    text-align:center; box-shadow:0 20px 40px rgba(0,0,0,.25);
+  }
+  .modal-box .icon{font-size:34px; margin-bottom:8px;}
+  .modal-box h3{font-family:'Oswald',sans-serif; font-size:16px; margin:0 0 6px; color:var(--rose); text-transform:uppercase;}
+  .modal-box p{font-size:13px; color:var(--slate-600); margin:0 0 16px;}
+  .modal-box button{
+    background:var(--navy); color:#fff; border:none; border-radius:8px; padding:10px 22px;
+    font-size:14px; font-weight:600; cursor:pointer; font-family:inherit;
+  }
+
+  /* ---- Login screen ---- */
+  #loginScreen{
+    min-height:100vh; display:flex; justify-content:center; align-items:center;
+    background:linear-gradient(135deg, #0b2e59, #1a73e8); padding:20px;
+  }
+  .auth-card{
+    background:#fff; width:100%; max-width:400px; padding:40px 30px; border-radius:12px;
+    box-shadow:0 10px 30px rgba(0,0,0,.4); text-align:center; box-sizing:border-box;
+    border-top:6px solid #145091;
+  }
+  .icon-circle{
+    width:70px; height:70px; background:#e8f0fe; border-radius:50%;
+    display:flex; justify-content:center; align-items:center; margin:0 auto 15px;
+  }
+  .icon-circle svg{ width:35px; height:35px; fill:#145091; }
+  .auth-card .logo-text{
+    font-size:30px; font-weight:900; color:#145091; margin:0; letter-spacing:1px; text-transform:uppercase;
+    font-family:'Oswald',sans-serif;
+  }
+  .auth-card .sub-text{
+    font-size:13px; color:#555; margin-top:5px; margin-bottom:28px; font-weight:600;
+    text-transform:uppercase; letter-spacing:.5px;
+  }
+  .auth-card .form-group{ margin-bottom:20px; text-align:left; }
+  .auth-card .form-group label{ display:block; font-size:13px; color:#333; margin-bottom:8px; font-weight:700; }
+  .auth-card .form-group input{
+    width:100%; padding:14px 15px; border:1px solid #ccc; border-radius:8px; font-size:15px;
+    box-sizing:border-box; outline:none; transition:all .2s ease; background:#f9f9f9; font-family:inherit;
+  }
+  .auth-card .form-group input:focus{
+    border-color:#145091; background:#fff; box-shadow:0 0 0 3px rgba(20,80,145,.15);
+  }
+  .auth-card .btn-action{
+    width:100%; background:#145091; color:#fff; padding:14px; border:none; border-radius:8px;
+    font-size:16px; font-weight:bold; cursor:pointer; font-family:inherit;
+  }
+  .auth-card .btn-action:active{ transform:scale(.98); }
+  .auth-card .footer-text{ margin-top:22px; font-size:12px; color:#777; }
+  .auth-error{
+    display:none; background:#fef2f2; border:1px solid #fecaca; color:#b91c1c;
+    font-size:13px; padding:10px 12px; border-radius:8px; margin-bottom:18px; text-align:left;
+  }
+  .auth-error.show{ display:block; }
+  .logout-btn{
+    background:transparent; border:none; color:var(--slate-400); font-size:11px; cursor:pointer;
+    font-family:inherit; text-decoration:underline; padding:0; margin-left:auto;
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="loginScreen">
+  <div class="auth-card">
+    <div class="icon-circle">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+    </div>
+    <h2 class="logo-text">Store Audit</h2>
+    <div class="sub-text">Operations &amp; Inventory</div>
+
+    <div id="authError" class="auth-error"></div>
+
+    <div class="form-group">
+      <label for="emailInput">Email Address</label>
+      <input type="email" id="emailInput" placeholder="Enter your email to access" onkeydown="if(event.key==='Enter') attemptLogin()">
+    </div>
+
+    <button class="btn-action" onclick="attemptLogin()">เข้าสู่ระบบ (Request Access)</button>
+
+    <div class="footer-text">Secure Access Portal &copy; 2026</div>
+  </div>
+</div>
+
+<!-- MAIN APP (hidden until login) -->
+<div id="appRoot" class="hidden">
+<header>
+  <div class="brand">
+    <div class="brand-badge">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="2.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    </div>
+    <div>
+      <h1>Audit Field Report</h1>
+      <p class="font-mono" id="currentUserTag">แบบฟอร์มออกตรวจสาขา</p>
+    </div>
+    <button class="logout-btn" onclick="logout()">ออกจากระบบ</button>
+  </div>
+  <div class="tabs">
+    <button class="tab-btn active" id="tabFormBtn" onclick="switchView('form')">📋 กรอกฟอร์ม</button>
+    <button class="tab-btn hidden" id="tabHistBtn" onclick="switchView('history')">🕘 ประวัติ (<span id="histCount">0</span>)</button>
+  </div>
+</header>
+
+<div id="toast" class="toast hidden"></div>
+
+<div id="notFoundModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="icon">⚠️</div>
+    <h3>ไม่พบข้อมูลสาขา</h3>
+    <p>กรุณาติดต่อ Admin เพื่อเพิ่มข้อมูลสาขานี้ในระบบ</p>
+    <button onclick="closeModal()">รับทราบ</button>
+  </div>
+</div>
+
+<div id="imgViewer" class="viewer-overlay hidden" onclick="if(event.target===this) closeImageViewer()">
+  <div class="viewer-topbar">
+    <button class="viewer-btn" onclick="closeImageViewer()">✕</button>
+  </div>
+  <div class="viewer-img-wrap"><img id="viewerImg" src=""></div>
+  <button class="viewer-download" onclick="downloadViewerImage()">⬇ ดาวน์โหลดรูปนี้</button>
+</div>
+
+<main>
+  <!-- FORM VIEW -->
+  <div id="formView">
+
+    <section class="card">
+      <div class="sec-head"><span class="sec-num">01</span><span class="sec-title">ข้อมูลส่วนตัว</span></div>
+      <div class="field"><label>ชื่อ-สกุล (ภาษาไทย)</label><input id="fullName" placeholder="เช่น สมชาย ใจดี"></div>
+      <div class="grid2">
+        <div class="field"><label>ชื่อเล่น</label><input id="nickname" placeholder="ชื่อเล่น"></div>
+        <div class="field"><label>เบอร์โทร</label><input id="phone" type="tel" placeholder="08X-XXX-XXXX"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>ประเภทรถ</label><input id="vehicleType" placeholder="เช่น รถยนต์ส่วนตัว"></div>
+        <div class="field"><label>ทะเบียนรถ</label><input id="plate" placeholder="กข 1234"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="sec-head"><span class="sec-num">02</span><span class="sec-title">ระบุสาขา</span></div>
+      <div class="field">
+        <label>Store No. / Store Name</label>
+        <select id="storeSelect" onchange="onStoreSelect()">
+          <option value="">-- เลือกสาขา --</option>
+        </select>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Store Name</label><input id="storeName" disabled></div>
+        <div class="field"><label>Store Format</label><input id="storeFormat" disabled></div>
+      </div>
+      <div class="field"><label>จังหวัด</label><input id="storeProvince" disabled></div>
+      <div class="field">
+        <label>ประเภทงานตรวจ</label>
+        <select id="taskType">
+          <option value="SOA ตรวจสาขา">SOA ตรวจสาขา</option>
+          <option value="INV full stock count">INV full stock count</option>
+        </select>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="sec-head"><span class="sec-num">03</span><span class="sec-title">ภาพแผนที่ &amp; ระยะทาง</span></div>
+      <div class="photo-row">
+        <div class="photo-slot">
+          <div class="photo-tag go">➡ ขาไป</div>
+          <div class="photo-drop" onclick="document.getElementById('goFile').click()">
+            <input type="file" id="goFile" accept="image/*" capture="environment" class="hidden" onchange="handleImage(event,'go')">
+            <div id="goPreviewWrap" class="photo-placeholder">📷<br>แตะเพื่อแนบภาพแผนที่</div>
+          </div>
+          <div class="dist-wrap">
+            <input type="number" id="goDistance" placeholder="ระยะทาง"><span>กม.</span>
+          </div>
+        </div>
+        <div class="photo-slot">
+          <div class="photo-tag back">➡ ขากลับ</div>
+          <div class="photo-drop" onclick="document.getElementById('backFile').click()">
+            <input type="file" id="backFile" accept="image/*" capture="environment" class="hidden" onchange="handleImage(event,'back')">
+            <div id="backPreviewWrap" class="photo-placeholder">📷<br>แตะเพื่อแนบภาพแผนที่</div>
+          </div>
+          <div class="dist-wrap">
+            <input type="number" id="backDistance" placeholder="ระยะทาง"><span>กม.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <button class="btn btn-primary" id="saveBtn" onclick="saveEntry()" style="margin-bottom:28px;">💾 Save file to admin</button>
+  </div>
+
+  <!-- HISTORY VIEW -->
+  <div id="historyView" class="hidden">
+    <div class="hist-topbar">
+      <p>ข้อมูลนี้เก็บอยู่ในเบราว์เซอร์เครื่องนี้เท่านั้น</p>
+      <div style="display:flex; gap:6px;">
+        <button class="btn-mini" onclick="exportExcel(getEntries())">⬇ Excel</button>
+        <button class="btn-mini" style="background:var(--rose);" onclick="exportPDF(getEntries())">🧾 PDF</button>
+      </div>
+    </div>
+    <div id="historyList"></div>
+  </div>
+</main>
+</div><!-- /appRoot -->
+
+<script>
+/* ===== Store master data (embedded) ===== */
+const STORES = [{"no": "1", "name": "Lat Phrao", "format": "Classic A", "province": "กรุงเทพมหานคร"}, {"no": "2", "name": "Chaeng Watthana", "format": "Classic A", "province": "นนทบุรี"}, {"no": "3", "name": "Srinakarin", "format": "Classic A", "province": "สมุทรปราการ"}, {"no": "4", "name": "Bangbon", "format": "Classic A", "province": "กรุงเทพมหานคร"}, {"no": "5", "name": "Chon Buri", "format": "Classic A", "province": "ชลบุรี"}, {"no": "6", "name": "Chiang Mai", "format": "Classic A", "province": "เชียงใหม่"}, {"no": "7", "name": "Nakhon Ratchasima", "format": "Classic A", "province": "นครราชสีมา"}, {"no": "8", "name": "Rangsit", "format": "Classic A", "province": "ปทุมธานี"}, {"no": "9", "name": "Hat Yai", "format": "Classic A", "province": "สงขลา"}, {"no": "10", "name": "Udon Thani", "format": "Classic A", "province": "อุดรธานี"}, {"no": "11", "name": "Phitsanulok", "format": "Classic A", "province": "พิษณุโลก"}, {"no": "12", "name": "Khon Kaen", "format": "Classic A", "province": "ขอนแก่น"}, {"no": "13", "name": "Surat Thani", "format": "Classic A", "province": "สุราษฎร์ธานี"}, {"no": "14", "name": "Ubon Ratchathani", "format": "Classic A", "province": "อุบลราชธานี"}, {"no": "15", "name": "Rayong", "format": "Classic A", "province": "ระยอง"}, {"no": "16", "name": "Nakhon Sawan", "format": "Classic A", "province": "นครสวรรค์"}, {"no": "17", "name": "Charansanitwong", "format": "Classic A", "province": "กรุงเทพมหานคร"}, {"no": "18", "name": "Sathon", "format": "Classic A", "province": "กรุงเทพมหานคร"}, {"no": "19", "name": "Nakhon Pathom", "format": "Classic B", "province": "นครปฐม"}, {"no": "20", "name": "Surin", "format": "Classic B", "province": "สุรินทร์"}, {"no": "21", "name": "Samsen", "format": "ECO Plus B", "province": "กรุงเทพมหานคร"}, {"no": "22", "name": "Nakhon Si Thammarat", "format": "Classic C", "province": "นครศรีธรรมราช"}, {"no": "23", "name": "Chiang Rai", "format": "Classic C", "province": "เชียงราย"}, {"no": "24", "name": "Sakon Nakhon", "format": "Classic C", "province": "สกลนคร"}, {"no": "25", "name": "Suphan Buri", "format": "Classic C", "province": "สุพรรณบุรี"}, {"no": "26", "name": "Chanthaburi", "format": "Classic C", "province": "จันทบุรี"}, {"no": "27", "name": "Phuket", "format": "ECO Plus B", "province": "ภูเก็ต"}, {"no": "28", "name": "Roi Et", "format": "Classic C", "province": "ร้อยเอ็ด"}, {"no": "29", "name": "Trang", "format": "Classic C", "province": "ตรัง"}, {"no": "30", "name": "Sa Kaeo", "format": "Classic B", "province": "สระแก้ว"}, {"no": "31", "name": "Koh Samui", "format": "Food Service C", "province": "สุราษฎร์ธานี"}, {"no": "32", "name": "Buri Ram", "format": "Classic B", "province": "บุรีรัมย์"}, {"no": "33", "name": "Si Sa Ket", "format": "Classic B", "province": "ศรีสะเกษ"}, {"no": "34", "name": "Lamphun", "format": "Classic B", "province": "ลำพูน"}, {"no": "35", "name": "Krabi", "format": "ECO Plus C", "province": "กระบี่"}, {"no": "36", "name": "Phetchaburi", "format": "Classic B", "province": "เพชรบุรี"}, {"no": "37", "name": "Chaiyaphum", "format": "Classic B", "province": "ชัยภูมิ"}, {"no": "38", "name": "Saraburi", "format": "Classic B", "province": "สระบุรี"}, {"no": "39", "name": "Pranburi", "format": "Classic B", "province": "ประจวบคีรีขันธ์"}, {"no": "40", "name": "Chachoengsao", "format": "Classic B", "province": "ฉะเชิงเทรา"}, {"no": "41", "name": "Chiang Mai 2_Hang Dong", "format": "ECO Plus B", "province": "เชียงใหม่"}, {"no": "42", "name": "Ram Inthra", "format": "Classic B", "province": "กรุงเทพมหานคร"}, {"no": "43", "name": "Chumphon", "format": "Classic B", "province": "ชุมพร"}, {"no": "44", "name": "Pattaya", "format": "ECO Plus B", "province": "ชลบุรี"}, {"no": "45", "name": "Kamphaeng Phet", "format": "Classic B", "province": "กำแพงเพชร"}, {"no": "46", "name": "Kanchanaburi", "format": "Classic B", "province": "กาญจนบุรี"}, {"no": "47", "name": "Lop Buri", "format": "Classic B", "province": "ลพบุรี"}, {"no": "48", "name": "Nong Khai", "format": "Classic B", "province": "หนองคาย"}, {"no": "49", "name": "Ratchaburi", "format": "Classic B", "province": "ราชบุรี"}, {"no": "50", "name": "Mae Rim", "format": "Classic B", "province": "เชียงใหม่"}, {"no": "51", "name": "Ayutthaya", "format": "Classic B", "province": "พระนครศรีอยุธยา"}, {"no": "52", "name": "Lampang", "format": "Classic B", "province": "ลำปาง"}, {"no": "53", "name": "Hua Hin", "format": "Food Service C", "province": "ประจวบคีรีขันธ์"}, {"no": "54", "name": "Khlong Luang", "format": "Classic B", "province": "ปทุมธานี"}, {"no": "55", "name": "Loei", "format": "Classic B", "province": "เลย"}, {"no": "56", "name": "Phetchabun", "format": "Classic B", "province": "เพชรบูรณ์"}, {"no": "57", "name": "Bang Phli", "format": "Classic B", "province": "สมุทรปราการ"}, {"no": "58", "name": "Mukdahan", "format": "Classic B", "province": "มุกดาหาร"}, {"no": "59", "name": "Satun", "format": "Classic B", "province": "สตูล"}, {"no": "60", "name": "Trat", "format": "Classic B", "province": "ตราด"}, {"no": "61", "name": "Chum Phae", "format": "Classic B", "province": "ขอนแก่น"}, {"no": "62", "name": "Rawai", "format": "Food Service E", "province": "ภูเก็ต"}, {"no": "63", "name": "Nakhon Phanom", "format": "Classic B", "province": "นครพนม"}, {"no": "64", "name": "Koh Pha Ngan", "format": "Food Service E", "province": "สุราษฎร์ธานี"}, {"no": "65", "name": "Bueng Kan", "format": "Classic B", "province": "บึงกาฬ"}, {"no": "66", "name": "North Pattaya", "format": "Food Service D", "province": "ชลบุรี"}, {"no": "67", "name": "Mae Sai", "format": "Classic B", "province": "เชียงราย"}, {"no": "68", "name": "Salaya", "format": "Classic B", "province": "นครปฐม"}, {"no": "69", "name": "Phatthalung", "format": "Classic B", "province": "พัทลุง"}, {"no": "70", "name": "Sukhothai", "format": "Classic C", "province": "สุโขทัย"}, {"no": "71", "name": "Patong", "format": "Food Service E", "province": "ภูเก็ต"}, {"no": "72", "name": "Samut Sakhon", "format": "Classic B", "province": "สมุทรสาคร"}, {"no": "73", "name": "Mae Sot", "format": "Classic B", "province": "ตาก"}, {"no": "74", "name": "Pak Chong", "format": "ECO Plus B", "province": "นครราชสีมา"}, {"no": "75", "name": "Thalang", "format": "ECO Plus B", "province": "ภูเก็ต"}, {"no": "76", "name": "Ranong", "format": "Classic B", "province": "ระนอง"}, {"no": "77", "name": "Lamai", "format": "Food Service C", "province": "สุราษฎร์ธานี"}, {"no": "78", "name": "Kanlapaphruek", "format": "Food Service D", "province": "กรุงเทพมหานคร"}, {"no": "79", "name": "Yasothon", "format": "Classic B", "province": "ยโสธร"}, {"no": "80", "name": "Maha Sarakham", "format": "Classic B", "province": "มหาสารคาม"}, {"no": "81", "name": "Fang", "format": "Classic C", "province": "เชียงราย"}, {"no": "82", "name": "Nakhon Nayok", "format": "Classic B", "province": "นครนายก"}, {"no": "83", "name": "Nakhon In", "format": "ECO Plus B", "province": "นนทบุรี"}, {"no": "84", "name": "Ban Phe", "format": "Food Service D", "province": "ระยอง"}, {"no": "85", "name": "Thung Song", "format": "Classic B", "province": "นครศรีธรรมราช"}, {"no": "86", "name": "Srinakarin 2", "format": "Food Service D", "province": "กรุงเทพมหานคร"}, {"no": "87", "name": "Phayao", "format": "Classic B", "province": "พะเยา"}, {"no": "89", "name": "Phitsanulok 2", "format": "ECO Plus B", "province": "พิษณุโลก"}, {"no": "91", "name": "F-Talad Mueang Mai (M-St.6)", "format": "Frozen Shop", "province": "เชียงใหม่"}, {"no": "92", "name": "F-Udon Thani (M-St.10)", "format": "Frozen Shop", "province": "อุดรธานี"}, {"no": "93", "name": "F-Thung Song (M-St.85)", "format": "Frozen Shop", "province": "นครศรีธรรมราช"}, {"no": "94", "name": "F-Talad Yamo (M-St.102)", "format": "Frozen Shop", "province": "นครราชสีมา"}, {"no": "95", "name": "F-Si Racha (M-St.109)", "format": "Frozen Shop", "province": "ชลบุรี"}, {"no": "96", "name": "Town In Town", "format": "Food Shop", "province": "กรุงเทพมหานคร"}, {"no": "97", "name": "F-Thanon Chan", "format": "Frozen Shop", "province": "กรุงเทพมหานคร"}, {"no": "98", "name": "F-Talad Nana Charoen (M-St.08)", "format": "Frozen Shop", "province": "ปทุมธานี"}, {"no": "100", "name": "Phrae", "format": "Classic C", "province": "แพร่"}, {"no": "101", "name": "Koh Chang", "format": "Food Service E", "province": "ตราด"}, {"no": "102", "name": "Nakhon Ratchasima 2", "format": "ECO Plus B", "province": "นครราชสีมา"}, {"no": "103", "name": "Nan", "format": "Classic B", "province": "น่าน"}, {"no": "104", "name": "Ao Nang", "format": "Food Service E", "province": "กระบี่"}, {"no": "105", "name": "Karon", "format": "Food Service E", "province": "ภูเก็ต"}, {"no": "106", "name": "Warin Chamrap", "format": "Classic B", "province": "อุบลราชธานี"}, {"no": "107", "name": "Nong Bua Lam Phu", "format": "Classic B", "province": "หนองบัวลำภู"}, {"no": "108", "name": "Nong Chok", "format": "Classic C", "province": "กรุงเทพมหานคร"}, {"no": "109", "name": "Laem Chabang", "format": "Food Service C", "province": "ชลบุรี"}, {"no": "110", "name": "Prachuap Khiri Khan", "format": "Classic B", "province": "ประจวบคีรีขันธ์"}, {"no": "111", "name": "Phet Kasem", "format": "ECO Plus B", "province": "กรุงเทพมหานคร"}, {"no": "112", "name": "Bang Poo", "format": "Food Service E", "province": "สมุทรปราการ"}, {"no": "113", "name": "Wang Hin", "format": "Food Service E", "province": "กรุงเทพมหานคร"}, {"no": "114", "name": "Sing Buri", "format": "Classic B", "province": "สิงห์บุรี"}, {"no": "115", "name": "Bang Bua Thong", "format": "ECO Plus B", "province": "นนทบุรี"}, {"no": "116", "name": "Kalasin", "format": "Classic B", "province": "กาฬสินธุ์"}, {"no": "117", "name": "Udom Suk", "format": "Food Service E", "province": "กรุงเทพมหานคร"}, {"no": "118", "name": "Ramkhamhaeng (Sammakorn)", "format": "Food Service E", "province": "กรุงเทพมหานคร"}, {"no": "119", "name": "Phichit", "format": "Classic C", "province": "พิจิตร"}, {"no": "120", "name": "Pathum Thani", "format": "Classic B", "province": "ปทุมธานี"}, {"no": "121", "name": "Bodindecha", "format": "Food Service D", "province": "กรุงเทพมหานคร"}, {"no": "122", "name": "Pracha Uthit", "format": "Food Service E", "province": "กรุงเทพมหานคร"}, {"no": "123", "name": "Sukhumvit 71", "format": "Food Service E", "province": "กรุงเทพมหานคร"}, {"no": "124", "name": "Nawamin 70", "format": "Food Service D", "province": "กรุงเทพมหานคร"}, {"no": "125", "name": "Cha-am", "format": "Food Service D", "province": "เพชรบุรี"}, {"no": "126", "name": "On Nut", "format": "Food Service D", "province": "กรุงเทพมหานคร"}, {"no": "127", "name": "Suksawat", "format": "Food Service E", "province": "กรุงเทพมหานคร"}, {"no": "128", "name": "Kabin Buri", "format": "ECO Plus B", "province": "ปราจีนบุรี"}, {"no": "129", "name": "Lat Krabang", "format": "Food Service E", "province": "กรุงเทพมหานคร"}, {"no": "130", "name": "Na Thong Charoen", "format": "Food Service E", "province": "ปทุมธานี"}, {"no": "131", "name": "Bo Win", "format": "ECO Plus C", "province": "ระยอง"}, {"no": "132", "name": "Sattahip", "format": "ECO Plus C", "province": "ชลบุรี"}, {"no": "133", "name": "Ramkhamhaeng 24", "format": "Food Service C", "province": "กรุงเทพมหานคร"}, {"no": "134", "name": "Amata Nakorn", "format": "Food Service D", "province": "ชลบุรี"}, {"no": "135", "name": "Bang Kho Laem", "format": "Food Service E", "province": "กรุงเทพมหานคร"}, {"no": "136", "name": "Khon Kaen 2", "format": "Food Service D", "province": "ขอนแก่น"}, {"no": "137", "name": "Wongsakorn 2", "format": "Food Service D", "province": "กรุงเทพมหานคร"}, {"no": "138", "name": "Meng Jai", "format": "Food Service E", "province": "กรุงเทพมหานคร"}, {"no": "139", "name": "Sukhumvit 22", "format": "Food Service D", "province": "กรุงเทพมหานคร"}, {"no": "140", "name": "Chan Road", "format": "Food Service E", "province": "กรุงเทพมหานคร"}, {"no": "141", "name": "Lam Luk Ka", "format": "Food Service D", "province": "ปทุมธานี"}, {"no": "142", "name": "Phraeksa", "format": "Food Service E", "province": "สมุทรปราการ"}, {"no": "143", "name": "Pradit Manutham", "format": "Food Service C", "province": "กรุงเทพมหานคร"}, {"no": "144", "name": "Rungroj Market (Khlong 4)", "format": "Food Service E", "province": "ปทุมธานี"}, {"no": "145", "name": "Phongphet", "format": "Food Service E", "province": "กรุงเทพมหานคร"}, {"no": "146", "name": "Uttaradit", "format": "ECO Plus C", "province": "อุตรดิตถ์"}, {"no": "147", "name": "Mueang Thong", "format": "Food Service D", "province": "นนทบุรี"}, {"no": "148", "name": "Liap Khlong 2", "format": "Food Service E", "province": "กรุงเทพมหานคร"}, {"no": "149", "name": "Om Noi", "format": "Classic C", "province": "สมุทรสาคร"}, {"no": "150", "name": "Sanam Bin Nam", "format": "Food Service D", "province": "นนทบุรี"}, {"no": "151", "name": "Thep Rak", "format": "Food Service D", "province": "กรุงเทพมหานคร"}, {"no": "152", "name": "Samut Songkhram", "format": "ECO Plus C", "province": "สมุทรสงคราม"}, {"no": "153", "name": "Wiang Sa", "format": "ECO Plus C", "province": "สุราษฎร์ธานี"}, {"no": "154", "name": "Prachin Buri", "format": "ECO Plus C", "province": "ปราจีนบุรี"}, {"no": "155", "name": "Pinklao", "format": "Food Service D", "province": "กรุงเทพมหานคร"}, {"no": "156", "name": "Samut Prakan", "format": "ECO Plus C", "province": "สมุทรปราการ"}, {"no": "157", "name": "Nakhon Ratchasima 3 (Save One)", "format": "ECO Plus C", "province": "นครราชสีมา"}, {"no": "158", "name": "Nakhon Sawan 2 (Phrom Nimit)", "format": "ECO Plus C", "province": "นครสวรรค์"}, {"no": "159", "name": "Udon Thani 2 (Ban Lueam)", "format": "ECO Plus C", "province": "อุดรธานี"}, {"no": "160", "name": "Mahachai", "format": "ECO Plus C", "province": "สมุทรสาคร"}, {"no": "161", "name": "Khon Kaen 3 (Ban Non Muang)", "format": "ECO Plus C", "province": "ขอนแก่น"}, {"no": "162", "name": "Amata Nakorn 2", "format": "ECO Plus C", "province": "ชลบุรี"}, {"no": "163", "name": "Songkhla", "format": "ECO Plus C", "province": "สงขลา"}, {"no": "164", "name": "Chai Nat", "format": "ECO Plus C", "province": "ชัยนาท"}, {"no": "165", "name": "Si Ayutthaya Road", "format": "ECO Plus C", "province": "กรุงเทพมหานคร"}, {"no": "166", "name": "Rawai 2", "format": "ECO Plus C", "province": "ภูเก็ต"}, {"no": "167", "name": "Chiang Mai (Chom Thong)", "format": "ECO Plus C", "province": "เชียงใหม่"}, {"no": "168", "name": "Ban Bueng (Chon Buri)", "format": "ECO Plus C", "province": "ชลบุรี"}, {"no": "169", "name": "Phangnga", "format": "ECO Plus C", "province": "พังงา"}, {"no": "170", "name": "Amnat Charoen", "format": "ECO Plus C", "province": "อำนาจเจริญ"}, {"no": "171", "name": "Jo Ho (Nakhon Ratchasima)", "format": "ECO Plus C", "province": "นครราชสีมา"}, {"no": "172", "name": "Ban Phai", "format": "ECO Plus C", "province": "ขอนแก่น"}, {"no": "173", "name": "Hat Yai 2", "format": "Classic A", "province": "สงขลา"}, {"no": "174", "name": "Cherng Talay", "format": "Classic A", "province": "ภูเก็ต"}, {"no": "175", "name": "Happitat (Bangna)", "format": "Classic A", "province": "สมุทรปราการ"}, {"no": "176", "name": "Pha Ngan 2", "format": "Classic A", "province": "ภูเก็ต"}, {"no": "300", "name": "Talad Wongsakorn", "format": "Food Shop", "province": "กรุงเทพมหานคร"}, {"no": "301", "name": "Rama 4", "format": "Food Shop", "province": "กรุงเทพมหานคร"}, {"no": "302", "name": "Thonglor", "format": "Food Shop", "province": "กรุงเทพมหานคร"}, {"no": "303", "name": "Siri Mangkhalachan", "format": "Food Shop", "province": "เชียงใหม่"}, {"no": "350", "name": "Ram Inthra KM.4", "format": "Fresh@Makro", "province": "กรุงเทพมหานคร"}, {"no": "351", "name": "Sino Park", "format": "Fresh@Makro", "province": "สมุทรปราการ"}, {"no": "352", "name": "Phatthanakan", "format": "Fresh@Makro", "province": "กรุงเทพมหานคร"}, {"no": "500", "name": "F-Na Klua (M-St.66)", "format": "Frozen Shop", "province": "ชลบุรี"}, {"no": "528", "name": "Chaeng Watthana", "format": "Baker Mart", "province": "นนทบุรี"}];
+
+const STORAGE_KEY = 'audit_entries_v2';
+let goImageData = null, backImageData = null;
+let currentUserEmail = null;
+
+/* ===== Access control ===== */
+const ADMIN_EMAILS = [
+  'inv_support1@cpaxtra.co.th',
+  'soa_admin1@cpaxtra.co.th'
+];
+const ALLOWED_EMAILS = ADMIN_EMAILS.concat([
+  'inv1@cpaxtra.co.th','inv2@cpaxtra.co.th','inv3@cpaxtra.co.th','inv4@cpaxtra.co.th','inv5@cpaxtra.co.th',
+  'inv6@cpaxtra.co.th','inv7@cpaxtra.co.th','inv8@cpaxtra.co.th','inv9@cpaxtra.co.th','inv10@cpaxtra.co.th',
+  'inv11@cpaxtra.co.th','inv12@cpaxtra.co.th','inv13@cpaxtra.co.th','inv14@cpaxtra.co.th','inv15@cpaxtra.co.th',
+  'rsoa1@cpaxtra.co.th','rsoa2@cpaxtra.co.th','rsoa3@cpaxtra.co.th','rsoa4@cpaxtra.co.th',
+  'soa1@cpaxtra.co.th','soa2@cpaxtra.co.th','soa3@cpaxtra.co.th','soa4@cpaxtra.co.th','soa5@cpaxtra.co.th',
+  'soa6@cpaxtra.co.th','soa7@cpaxtra.co.th','soa8@cpaxtra.co.th','soa9@cpaxtra.co.th','soa10@cpaxtra.co.th',
+  'soa11@cpaxtra.co.th','soa12@cpaxtra.co.th','soa13@cpaxtra.co.th','soa14@cpaxtra.co.th','soa15@cpaxtra.co.th',
+  'soa16@cpaxtra.co.th','soa17@cpaxtra.co.th',
+  'ntantiha@cpaxtra.co.th','tsirimet@cpaxtra.co.th',
+  'soa_support1@cpaxtra.co.th','soa_support2@cpaxtra.co.th'
+]);
+
+function attemptLogin(){
+  const raw = document.getElementById('emailInput').value.trim();
+  const email = raw.toLowerCase();
+  const errBox = document.getElementById('authError');
+
+  if(!email){
+    errBox.textContent = 'กรุณากรอกอีเมล';
+    errBox.classList.add('show');
+    return;
+  }
+  if(ALLOWED_EMAILS.indexOf(email) === -1){
+    errBox.textContent = 'อีเมลนี้ไม่มีสิทธิ์เข้าใช้งาน กรุณาติดต่อ Admin';
+    errBox.classList.add('show');
+    return;
+  }
+  errBox.classList.remove('show');
+  currentUserEmail = raw;
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('appRoot').classList.remove('hidden');
+  document.getElementById('currentUserTag').textContent = raw;
+  document.getElementById('tabHistBtn').classList.toggle('hidden', ADMIN_EMAILS.indexOf(email) === -1);
+}
+
+function logout(){
+  currentUserEmail = null;
+  document.getElementById('emailInput').value = '';
+  document.getElementById('authError').classList.remove('show');
+  document.getElementById('appRoot').classList.add('hidden');
+  document.getElementById('loginScreen').classList.remove('hidden');
+  switchView('form');
+}
+
+/* ---- populate store dropdown ---- */
+function initStoreDropdown(){
+  const sel = document.getElementById('storeSelect');
+  STORES.forEach(function(s){
+    const opt = document.createElement('option');
+    opt.value = s.no;
+    opt.textContent = s.no + ' - ' + s.name;
+    sel.appendChild(opt);
+  });
+}
+
+function onStoreSelect(){
+  const no = document.getElementById('storeSelect').value;
+  if(!no){
+    document.getElementById('storeName').value = '';
+    document.getElementById('storeFormat').value = '';
+    document.getElementById('storeProvince').value = '';
+    return;
+  }
+  const store = STORES.find(function(s){ return s.no === no; });
+  if(!store){
+    showModal();
+    document.getElementById('storeSelect').value = '';
+    document.getElementById('storeName').value = '';
+    document.getElementById('storeFormat').value = '';
+    document.getElementById('storeProvince').value = '';
+    return;
+  }
+  document.getElementById('storeName').value = store.name;
+  document.getElementById('storeFormat').value = store.format;
+  document.getElementById('storeProvince').value = store.province;
+}
+
+function showModal(){ document.getElementById('notFoundModal').classList.remove('hidden'); }
+function closeModal(){ document.getElementById('notFoundModal').classList.add('hidden'); }
+
+function getEntries(){
+  try{ return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+  catch(e){ return []; }
+}
+function setEntries(list){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+}
+
+function switchView(view){
+  document.getElementById('formView').classList.toggle('hidden', view!=='form');
+  document.getElementById('historyView').classList.toggle('hidden', view!=='history');
+  document.getElementById('tabFormBtn').classList.toggle('active', view==='form');
+  document.getElementById('tabHistBtn').classList.toggle('active', view==='history');
+  if(view==='history') renderHistory();
+}
+
+function showToast(msg, ok){
+  if(ok === undefined) ok = true;
+  const t = document.getElementById('toast');
+  t.textContent = (ok? '✓ ' : '✕ ') + msg;
+  t.className = 'toast ' + (ok?'ok':'err');
+  t.classList.remove('hidden');
+  setTimeout(function(){ t.classList.add('hidden'); }, 2600);
+}
+
+function compressImage(file, maxWidth, quality){
+  maxWidth = maxWidth || 900; quality = quality || 0.55;
+  return new Promise(function(resolve, reject){
+    const reader = new FileReader();
+    reader.onload = function(e){
+      const img = new Image();
+      img.onload = function(){
+        const scale = Math.min(1, maxWidth / img.width);
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function handleImage(event, which){
+  const file = event.target.files[0];
+  if(!file) return;
+  const wrap = document.getElementById(which+'PreviewWrap');
+  wrap.innerHTML = '⏳';
+  compressImage(file).then(function(dataUrl){
+    if(which==='go') goImageData = dataUrl; else backImageData = dataUrl;
+    wrap.innerHTML = '<img src="'+dataUrl+'"><button type="button" class="photo-remove" onclick="removeImage(event,\''+which+'\')">✕</button>';
+  }).catch(function(){
+    wrap.innerHTML = '📷<br>แนบภาพไม่สำเร็จ ลองใหม่';
+  });
+}
+function removeImage(e, which){
+  e.stopPropagation();
+  if(which==='go') goImageData = null; else backImageData = null;
+  document.getElementById(which+'PreviewWrap').innerHTML = '📷<br>แตะเพื่อแนบภาพแผนที่';
+  document.getElementById(which+'File').value = '';
+}
+
+function fmtDate(ts){
+  const d = new Date(ts);
+  return d.toLocaleString('th-TH', {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'});
+}
+
+function resetForm(){
+  ['fullName','nickname','phone','vehicleType','plate','goDistance','backDistance']
+    .forEach(function(id){ document.getElementById(id).value = ''; });
+  document.getElementById('storeSelect').value = '';
+  document.getElementById('storeName').value = '';
+  document.getElementById('storeFormat').value = '';
+  document.getElementById('storeProvince').value = '';
+  document.getElementById('taskType').selectedIndex = 0;
+  goImageData = null; backImageData = null;
+  document.getElementById('goPreviewWrap').innerHTML = '📷<br>แตะเพื่อแนบภาพแผนที่';
+  document.getElementById('backPreviewWrap').innerHTML = '📷<br>แตะเพื่อแนบภาพแผนที่';
+  document.getElementById('goFile').value = '';
+  document.getElementById('backFile').value = '';
+}
+
+function saveEntry(){
+  const fullName = document.getElementById('fullName').value.trim();
+  const storeNo = document.getElementById('storeSelect').value;
+  if(!fullName || !storeNo){
+    showToast('กรุณากรอกชื่อ-สกุล และเลือกสาขา', false);
+    return;
+  }
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true;
+
+  const entry = {
+    id: Date.now().toString(),
+    savedAt: Date.now(),
+    savedBy: currentUserEmail || '-',
+    fullName: fullName,
+    nickname: document.getElementById('nickname').value.trim(),
+    phone: document.getElementById('phone').value.trim(),
+    vehicleType: document.getElementById('vehicleType').value.trim(),
+    plate: document.getElementById('plate').value.trim(),
+    storeNo: storeNo,
+    storeName: document.getElementById('storeName').value,
+    storeFormat: document.getElementById('storeFormat').value,
+    storeProvince: document.getElementById('storeProvince').value,
+    taskType: document.getElementById('taskType').value,
+    goDistance: document.getElementById('goDistance').value,
+    backDistance: document.getElementById('backDistance').value,
+    goImage: goImageData,
+    backImage: backImageData
+  };
+
+  try{
+    const list = getEntries();
+    list.unshift(entry);
+    setEntries(list);
+    updateHistCount();
+    resetForm();
+    showToast('บันทึกข้อมูลลงเครื่องนี้เรียบร้อย');
+  }catch(e){
+    showToast('บันทึกไม่สำเร็จ (พื้นที่เก็บข้อมูลอาจเต็ม)', false);
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+function deleteEntry(id){
+  const list = getEntries().filter(function(e){ return e.id !== id; });
+  setEntries(list);
+  renderHistory();
+  updateHistCount();
+  showToast('ลบรายการแล้ว');
+}
+
+function updateHistCount(){
+  document.getElementById('histCount').textContent = getEntries().length;
+}
+
+function escapeHtml(str){
+  if(!str) return '';
+  return str.replace(/[&<>"']/g, function(c){
+    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+  });
+}
+
+function renderHistory(){
+  const list = getEntries();
+  const container = document.getElementById('historyList');
+  if(list.length === 0){
+    container.innerHTML = '<div class="empty-state">ยังไม่มีประวัติการบันทึก</div>';
+    return;
+  }
+  container.innerHTML = list.map(function(e){
+    let imgsHtml = '';
+    if(e.goImage || e.backImage){
+      imgsHtml = '<div class="entry-imgs">' +
+        (e.goImage ? '<div class="img-slot"><img src="'+e.goImage+'" onclick="openImageViewer(\''+e.id+'\',\'go\')"><div class="img-cap">ขาไป</div></div>' : '') +
+        (e.backImage ? '<div class="img-slot"><img src="'+e.backImage+'" onclick="openImageViewer(\''+e.id+'\',\'back\')"><div class="img-cap">ขากลับ</div></div>' : '') +
+        '</div>';
+    }
+    return '<div class="entry-card">' +
+      '<div class="entry-top">' +
+        '<div>' +
+          '<p class="entry-title">'+escapeHtml(e.storeNo)+' · '+escapeHtml(e.storeName || '-')+'</p>' +
+          '<p class="entry-date">'+fmtDate(e.savedAt)+' · '+escapeHtml(e.storeProvince||'')+'</p>' +
+          '<p class="entry-date" style="color:#2563eb">บันทึกโดย: '+escapeHtml(e.savedBy||'-')+'</p>' +
+        '</div>' +
+        '<button class="del-btn" onclick="deleteEntry(\''+e.id+'\')">🗑</button>' +
+      '</div>' +
+      '<div class="entry-meta">' +
+        '<span>ผู้ตรวจ: '+escapeHtml(e.fullName)+' ('+escapeHtml(e.nickname||'-')+')</span>' +
+        '<span>โทร: '+escapeHtml(e.phone||'-')+'</span>' +
+        '<span>ประเภท: '+escapeHtml(e.taskType)+'</span>' +
+        '<span>Format: '+escapeHtml(e.storeFormat||'-')+'</span>' +
+        '<span>ขาไป: '+escapeHtml(e.goDistance||'-')+' กม.</span>' +
+        '<span>ขากลับ: '+escapeHtml(e.backDistance||'-')+' กม.</span>' +
+      '</div>' +
+      imgsHtml +
+      '<div class="entry-actions">' +
+        '<button class="btn-pdf" onclick="exportPDF([getEntries().find(function(x){return x.id===\''+e.id+'\';})])">🧾 Export PDF รายการนี้</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function exportExcel(rows){
+  if(!rows || rows.length===0){
+    showToast('ไม่มีข้อมูลให้ export', false);
+    return;
+  }
+  const data = rows.map(function(e){
+    return {
+      'วันที่บันทึก': fmtDate(e.savedAt),
+      'บันทึกโดย (อีเมล)': e.savedBy,
+      'ชื่อ-สกุล': e.fullName,
+      'ชื่อเล่น': e.nickname,
+      'เบอร์โทร': e.phone,
+      'ประเภทรถ': e.vehicleType,
+      'ทะเบียนรถยนต์': e.plate,
+      'Store No.': e.storeNo,
+      'Store Name': e.storeName,
+      'Store Format': e.storeFormat,
+      'จังหวัด': e.storeProvince,
+      'ประเภทงาน': e.taskType,
+      'ระยะทางขาไป (กม.)': e.goDistance,
+      'ระยะทางขากลับ (กม.)': e.backDistance
+    };
+  });
+  const ws = XLSX.utils.json_to_sheet(data);
+  ws['!cols'] = Object.keys(data[0]).map(function(k){ return { wch: Math.max(14, k.length+2) }; });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Audit Report');
+  const dateStr = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, 'audit-field-report-'+dateStr+'.xlsx');
+  showToast('Export Excel สำเร็จ');
+}
+
+/* ===== Image lightbox viewer ===== */
+let viewerCurrentSrc = null, viewerCurrentName = 'photo.jpg';
+function openImageViewer(entryId, which){
+  const entry = getEntries().find(function(x){ return x.id === entryId; });
+  if(!entry) return;
+  const src = which === 'go' ? entry.goImage : entry.backImage;
+  if(!src) return;
+  viewerCurrentSrc = src;
+  viewerCurrentName = escapeHtml(entry.storeNo||'store') + '-' + (which==='go'?'khaipai':'khaklab') + '.jpg';
+  document.getElementById('viewerImg').src = src;
+  document.getElementById('imgViewer').classList.remove('hidden');
+}
+function closeImageViewer(){
+  document.getElementById('imgViewer').classList.add('hidden');
+  document.getElementById('viewerImg').src = '';
+}
+function downloadViewerImage(){
+  if(!viewerCurrentSrc) return;
+  const a = document.createElement('a');
+  a.href = viewerCurrentSrc;
+  a.download = viewerCurrentName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+/* ===== PDF export (data + images), rendered via html2canvas for correct Thai text ===== */
+function buildEntryReportEl(e){
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'width:760px;background:#fff;padding:28px;font-family:Inter,Tahoma,sans-serif;color:#1e293b;box-sizing:border-box;';
+  const imgsHtml =
+    '<div style="display:flex;gap:16px;margin-top:16px;">' +
+      (e.goImage ? '<div style="flex:1;"><div style="background:#334155;color:#fff;font-size:11px;font-weight:700;padding:6px 8px;border-radius:6px 6px 0 0;">ขาไป'+(e.goDistance? ' · '+escapeHtml(e.goDistance)+' กม.':'')+'</div><img src="'+e.goImage+'" style="width:100%;display:block;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 6px 6px;"></div>' : '') +
+      (e.backImage ? '<div style="flex:1;"><div style="background:#d97706;color:#fff;font-size:11px;font-weight:700;padding:6px 8px;border-radius:6px 6px 0 0;">ขากลับ'+(e.backDistance? ' · '+escapeHtml(e.backDistance)+' กม.':'')+'</div><img src="'+e.backImage+'" style="width:100%;display:block;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 6px 6px;"></div>' : '') +
+    '</div>';
+  wrap.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #0f172a;padding-bottom:12px;margin-bottom:16px;">' +
+      '<div><div style="font-size:20px;font-weight:700;letter-spacing:.02em;">Audit Field Report</div>' +
+      '<div style="font-size:11px;color:#64748b;margin-top:2px;">แบบฟอร์มออกตรวจสาขา</div></div>' +
+      '<div style="text-align:right;font-size:11px;color:#64748b;">'+fmtDate(e.savedAt)+'<br>บันทึกโดย: '+escapeHtml(e.savedBy||'-')+'</div>' +
+    '</div>' +
+    '<div style="font-size:17px;font-weight:700;margin-bottom:10px;">'+escapeHtml(e.storeNo)+' · '+escapeHtml(e.storeName||'-')+' <span style="font-weight:400;color:#64748b;font-size:13px;">('+escapeHtml(e.storeProvince||'-')+')</span></div>' +
+    '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+      trow('ผู้ตรวจ', escapeHtml(e.fullName)+' ('+escapeHtml(e.nickname||'-')+')', 'เบอร์โทร', escapeHtml(e.phone||'-')) +
+      trow('ประเภทงาน', escapeHtml(e.taskType||'-'), 'Store Format', escapeHtml(e.storeFormat||'-')) +
+      trow('ประเภทรถ', escapeHtml(e.vehicleType||'-'), 'ทะเบียนรถ', escapeHtml(e.plate||'-')) +
+    '</table>' +
+    imgsHtml;
+  function trow(l1,v1,l2,v2){
+    return '<tr>' +
+      '<td style="padding:6px 8px;color:#64748b;font-weight:600;width:110px;border-bottom:1px solid #f1f5f9;">'+l1+'</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">'+v1+'</td>' +
+      '<td style="padding:6px 8px;color:#64748b;font-weight:600;width:110px;border-bottom:1px solid #f1f5f9;">'+l2+'</td>' +
+      '<td style="padding:6px 8px;border-bottom:1px solid #f1f5f9;">'+v2+'</td>' +
+    '</tr>';
+  }
+  return wrap;
+}
+
+function exportPDF(rows){
+  if(!rows || rows.length===0 || !rows[0]){
+    showToast('ไม่มีข้อมูลให้ export', false);
+    return;
+  }
+  if(typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined'){
+    showToast('โหลดไลบรารี PDF ไม่สำเร็จ ลองใหม่อีกครั้ง', false);
+    return;
+  }
+  showToast('กำลังสร้าง PDF โปรดรอสักครู่...');
+  const holder = document.createElement('div');
+  holder.style.cssText = 'position:fixed; left:-9999px; top:0; z-index:-1;';
+  document.body.appendChild(holder);
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('p','pt','a4');
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+
+  let chain = Promise.resolve();
+  rows.forEach(function(e, idx){
+    chain = chain.then(function(){
+      const el = buildEntryReportEl(e);
+      holder.innerHTML = '';
+      holder.appendChild(el);
+      return html2canvas(el, { scale:2, useCORS:true, backgroundColor:'#ffffff' }).then(function(canvas){
+        const imgData = canvas.toDataURL('image/jpeg', 0.92);
+        const imgW = pageW - 40;
+        const imgH = imgW * canvas.height / canvas.width;
+        if(idx > 0) pdf.addPage();
+        let y = 20;
+        if(imgH <= pageH - 40){
+          pdf.addImage(imgData, 'JPEG', 20, y, imgW, imgH);
+        } else {
+          // scale down to fit one page height if a single report is unusually tall
+          const scaledH = pageH - 40;
+          const scaledW = scaledH * canvas.width / canvas.height;
+          pdf.addImage(imgData, 'JPEG', (pageW-scaledW)/2, 20, scaledW, scaledH);
+        }
+      });
+    });
+  });
+
+  chain.then(function(){
+    document.body.removeChild(holder);
+    const dateStr = new Date().toISOString().slice(0,10);
+    const fname = rows.length===1
+      ? 'audit-report-'+(rows[0].storeNo||'store')+'-'+dateStr+'.pdf'
+      : 'audit-field-report-'+dateStr+'.pdf';
+    pdf.save(fname);
+    showToast('Export PDF สำเร็จ');
+  }).catch(function(err){
+    document.body.removeChild(holder);
+    showToast('สร้าง PDF ไม่สำเร็จ', false);
+  });
+}
+
+initStoreDropdown();
+updateHistCount();
+</script>
+</body>
+</html>
