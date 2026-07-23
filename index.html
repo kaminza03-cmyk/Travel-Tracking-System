@@ -113,6 +113,11 @@
   .entry-title{font-family:'Oswald',sans-serif; font-size:14px; text-transform:uppercase; letter-spacing:.02em; color:var(--slate-800); margin:0;}
   .entry-date{font-size:11px; color:var(--slate-400); font-family:'IBM Plex Mono',monospace; margin:2px 0 0;}
   .del-btn{background:none; border:none; color:var(--rose); cursor:pointer; padding:4px; font-size:15px;}
+  .edit-btn{background:none; border:none; color:#2563eb; cursor:pointer; padding:4px; font-size:15px;}
+  .entry-card.entry-editing{border-color:#16a34a; box-shadow:0 0 0 2px rgba(22,163,74,.15);}
+  .round-edit-block{border:1px dashed var(--slate-300); border-radius:8px; padding:10px; margin:10px 0;}
+  .round-edit-title{font-weight:700; font-size:13px; margin-bottom:6px;}
+  .btn-save-edit{background:#16a34a !important; color:#fff !important;}
   .entry-meta{display:grid; grid-template-columns:1fr 1fr; gap:4px 12px; font-size:12px; color:var(--slate-600); margin-top:8px;}
   .entry-imgs{display:flex; gap:8px; margin-top:10px;}
   .entry-imgs img{width:50%; aspect-ratio:4/3; object-fit:cover; border-radius:8px; border:1px solid var(--slate-200); cursor:zoom-in;}
@@ -441,8 +446,8 @@
       </label>
       <div style="display:flex; gap:6px;">
         <button class="btn-mini btn-bulk-delete" id="bulkDeleteBtn" onclick="requestBulkDelete()">🗑️ ลบที่เลือก (<span id="selectedCount">0</span>)</button>
-        <button class="btn-mini" onclick="exportExcel(getEntries())">⬇ Excel</button>
-        <button class="btn-mini" style="background:var(--rose);" onclick="exportPDF(getEntries())">🧾 PDF</button>
+        <button class="btn-mini" onclick="exportExcel(getEntries())">📊 Excel</button>
+        <button class="btn-mini" style="background:var(--rose);" onclick="exportPDF(getEntries())">📑 Export PDF ทั้งหมด</button>
       </div>
     </div>
     <p style="font-size:11px;color:var(--slate-500);margin:2px 0 10px;"> Admin ทุกคนเห็นข้อมูลร่วมกัน</p>
@@ -534,6 +539,7 @@ function uploadRoundImages(entryId, rounds){
 
 let goImageData = null, backImageData = null;
 let currentUserEmail = null;
+let currentUserIsAdmin = false;
 let draftRounds = [];       // rounds saved via "บันทึกร่าง / เพิ่มรอบถัดไป" for the current session
 let editingDraftIndex = null; // index into draftRounds currently being edited, or null
 const MAX_ROUNDS = 10;
@@ -582,18 +588,20 @@ function attemptLogin(){
   document.getElementById('appRoot').classList.remove('hidden');
   document.getElementById('currentUserTag').textContent = raw;
   const isAdmin = ADMIN_EMAILS.indexOf(email) !== -1;
-  document.getElementById('tabHistBtn').classList.toggle('hidden', !isAdmin);
+  currentUserIsAdmin = isAdmin;
+  document.getElementById('tabHistBtn').classList.remove('hidden');
   const roleBadge = document.getElementById('roleBadge');
   document.getElementById('roleBadgeText').textContent = isAdmin ? 'ADMIN' : 'USER';
   roleBadge.classList.remove('hidden', 'role-admin', 'role-user');
   roleBadge.classList.add(isAdmin ? 'role-admin' : 'role-user');
-  if(isAdmin){
-    startEntriesListener();
-  }
+  startEntriesListener();
 }
 
 function logout(){
   currentUserEmail = null;
+  currentUserIsAdmin = false;
+  editingEntryId = null;
+  editBuffer = null;
   document.getElementById('emailInput').value = '';
   document.getElementById('authError').classList.remove('show');
   document.getElementById('roleBadge').classList.add('hidden');
@@ -669,7 +677,11 @@ let entriesCache = [];
 let entriesUnsub = null;
 
 function getEntries(){
-  return entriesCache;
+  if(currentUserIsAdmin) return entriesCache;
+  const myEmail = (currentUserEmail||'').toLowerCase();
+  return entriesCache.filter(function(e){
+    return (e.savedBy||'').toLowerCase() === myEmail;
+  });
 }
 
 function startEntriesListener(){
@@ -1078,6 +1090,94 @@ function requestBulkDelete(){
   );
 }
 
+/* ===== Inline edit (history) ===== */
+let editingEntryId = null;
+let editBuffer = null;
+
+function buildStoreOptionsHtml(selectedNo){
+  let html = '<option value="">-- เลือกสาขา --</option>';
+  STORES.forEach(function(s){
+    html += '<option value="'+s.no+'"'+(s.no===selectedNo?' selected':'')+'>'+s.no+' - '+escapeHtml(s.name)+'</option>';
+  });
+  return html;
+}
+
+function toggleEditEntry(id){
+  if(editingEntryId === id){
+    editingEntryId = null;
+    editBuffer = null;
+  } else {
+    const entry = getEntries().find(function(x){ return x.id === id; });
+    if(!entry) return;
+    editingEntryId = id;
+    editBuffer = {
+      fullName: entry.fullName || '',
+      nickname: entry.nickname || '',
+      phone: entry.phone || '',
+      vehicleType: entry.vehicleType || '',
+      plate: entry.plate || '',
+      rounds: JSON.parse(JSON.stringify(getRounds(entry)))
+    };
+  }
+  renderHistory();
+}
+
+function cancelEditEntry(){
+  editingEntryId = null;
+  editBuffer = null;
+  renderHistory();
+}
+
+function updateEditField(field, value){
+  if(!editBuffer) return;
+  editBuffer[field] = value;
+}
+
+function updateEditRoundField(idx, field, value){
+  if(!editBuffer || !editBuffer.rounds[idx]) return;
+  editBuffer.rounds[idx][field] = value;
+}
+
+function updateEditRoundStore(idx, which, storeNo){
+  if(!editBuffer || !editBuffer.rounds[idx]) return;
+  const store = STORES.find(function(s){ return s.no === storeNo; });
+  const noKey = which === 'origin' ? 'storeNo' : 'destStoreNo';
+  const nameKey = which === 'origin' ? 'storeName' : 'destStoreName';
+  const formatKey = which === 'origin' ? 'storeFormat' : 'destStoreFormat';
+  const provinceKey = which === 'origin' ? 'storeProvince' : 'destStoreProvince';
+  editBuffer.rounds[idx][noKey] = storeNo;
+  editBuffer.rounds[idx][nameKey] = store ? store.name : '';
+  editBuffer.rounds[idx][formatKey] = store ? store.format : '';
+  editBuffer.rounds[idx][provinceKey] = store ? store.province : '';
+}
+
+function saveEditEntry(id){
+  if(!editBuffer) return;
+  if(!editBuffer.fullName.trim()){
+    showToast('กรุณากรอกชื่อ-สกุล', false);
+    return;
+  }
+  const payload = {
+    fullName: editBuffer.fullName.trim(),
+    nickname: editBuffer.nickname.trim(),
+    phone: editBuffer.phone.trim(),
+    vehicleType: editBuffer.vehicleType.trim(),
+    plate: editBuffer.plate.trim(),
+    rounds: editBuffer.rounds
+  };
+  db.collection(ENTRIES_COLLECTION).doc(id).update(payload)
+    .then(function(){
+      showToast('บันทึกการแก้ไขแล้ว');
+      editingEntryId = null;
+      editBuffer = null;
+      // onSnapshot listener refreshes entriesCache + re-renders automatically
+    })
+    .catch(function(err){
+      console.error('saveEditEntry failed', err);
+      showToast('บันทึกการแก้ไขไม่สำเร็จ: '+(err && err.message ? err.message : 'เกิดข้อผิดพลาด'), false);
+    });
+}
+
 function deleteEntry(id){
   showConfirmModal(
     'ยืนยันการลบ',
@@ -1157,6 +1257,48 @@ function renderHistory(){
       '</details>';
     }).join('');
 
+    if(editingEntryId === e.id && editBuffer){
+      const b = editBuffer;
+      const roundsEditHtml = b.rounds.map(function(r, idx){
+        return '<div class="round-edit-block">' +
+          '<div class="round-edit-title">รอบ '+(idx+1)+'</div>' +
+          '<div class="field"><label>สาขาต้นทาง</label><select onchange="updateEditRoundStore('+idx+',\'origin\',this.value)">'+buildStoreOptionsHtml(r.storeNo)+'</select></div>' +
+          '<div class="field"><label>สาขาปลายทาง</label><select onchange="updateEditRoundStore('+idx+',\'dest\',this.value)">'+buildStoreOptionsHtml(r.destStoreNo)+'</select></div>' +
+          '<div class="field"><label>ประเภทงานตรวจ</label><select onchange="updateEditRoundField('+idx+',\'taskType\',this.value)">' +
+            '<option value="SOA ตรวจสาขา"'+(r.taskType==='SOA ตรวจสาขา'?' selected':'')+'>SOA ตรวจสาขา</option>' +
+            '<option value="INV full stock count"'+(r.taskType==='INV full stock count'?' selected':'')+'>INV full stock count</option>' +
+          '</select></div>' +
+          '<div class="grid2">' +
+            '<div class="field"><label>วันที่ไป</label><input type="date" value="'+escapeHtml(r.dateFrom||'')+'" onchange="updateEditRoundField('+idx+',\'dateFrom\',this.value)"></div>' +
+            '<div class="field"><label>วันที่กลับ</label><input type="date" value="'+escapeHtml(r.dateTo||'')+'" onchange="updateEditRoundField('+idx+',\'dateTo\',this.value)"></div>' +
+          '</div>' +
+          '<div class="grid2">' +
+            '<div class="field"><label>ระยะทางขาไป (กม.)</label><input value="'+escapeHtml(r.goDistance||'')+'" oninput="updateEditRoundField('+idx+',\'goDistance\',this.value)"></div>' +
+            '<div class="field"><label>ระยะทางขากลับ (กม.)</label><input value="'+escapeHtml(r.backDistance||'')+'" oninput="updateEditRoundField('+idx+',\'backDistance\',this.value)"></div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+      return '<div class="entry-card entry-editing" data-entry-id="'+e.id+'">' +
+        '<p class="entry-title">✏️ กำลังแก้ไขรายการ</p>' +
+        '<div class="field"><label>ชื่อ-สกุล</label><input value="'+escapeHtml(b.fullName)+'" oninput="updateEditField(\'fullName\',this.value)"></div>' +
+        '<div class="grid2">' +
+          '<div class="field"><label>ชื่อเล่น</label><input value="'+escapeHtml(b.nickname)+'" oninput="updateEditField(\'nickname\',this.value)"></div>' +
+          '<div class="field"><label>เบอร์โทร</label><input value="'+escapeHtml(b.phone)+'" oninput="updateEditField(\'phone\',this.value)"></div>' +
+        '</div>' +
+        '<div class="grid2">' +
+          '<div class="field"><label>ประเภทรถ</label><input value="'+escapeHtml(b.vehicleType)+'" oninput="updateEditField(\'vehicleType\',this.value)"></div>' +
+          '<div class="field"><label>ทะเบียนรถ</label><input value="'+escapeHtml(b.plate)+'" oninput="updateEditField(\'plate\',this.value)"></div>' +
+        '</div>' +
+        roundsEditHtml +
+        '<p style="font-size:11px;color:var(--slate-500);margin:6px 0;">* รูปภาพแผนที่ไม่สามารถแก้ไขในโหมดนี้ได้ ถ้าต้องเปลี่ยนรูป ให้ลบรายการนี้แล้วบันทึกใหม่</p>' +
+        '<div class="confirm-btn-row" style="margin-top:10px;">' +
+          '<button class="btn-cancel" onclick="cancelEditEntry()">ยกเลิก</button>' +
+          '<button class="btn-save-edit" onclick="saveEditEntry(\''+e.id+'\')">💾 บันทึกการแก้ไข</button>' +
+        '</div>' +
+      '</div>';
+    }
+
     return '<div class="entry-card'+(selectedEntryIds.has(e.id)?' entry-selected':'')+'" data-entry-id="'+e.id+'">' +
       '<div class="entry-top">' +
         '<label class="entry-check"><input type="checkbox" onchange="toggleEntrySelect(\''+e.id+'\', this.checked)" '+(selectedEntryIds.has(e.id)?'checked':'')+'></label>' +
@@ -1165,7 +1307,10 @@ function renderHistory(){
           '<p class="entry-date">'+fmtDate(e.savedAt)+'</p>' +
           '<p class="entry-date" style="color:#2563eb">บันทึกโดย: '+escapeHtml(e.savedBy||'-')+'</p>' +
         '</div>' +
-        '<button class="del-btn" onclick="deleteEntry(\''+e.id+'\')">🗑️</button>' +
+        '<div style="display:flex;gap:4px;">' +
+          '<button class="edit-btn" onclick="toggleEditEntry(\''+e.id+'\')">✏️</button>' +
+          '<button class="del-btn" onclick="deleteEntry(\''+e.id+'\')">🗑️</button>' +
+        '</div>' +
       '</div>' +
       '<div class="entry-meta">' +
         '<span>โทร: '+escapeHtml(e.phone||'-')+'</span>' +
@@ -1273,9 +1418,11 @@ function downloadViewerImage(){
       URL.revokeObjectURL(blobUrl);
     })
     .catch(function(){
-      // CORS likely not configured on the Storage bucket yet — fall back to opening the image
-      showToast('ดาวน์โหลดโดยตรงไม่สำเร็จ (อาจยังไม่ได้ตั้งค่า CORS) กำลังเปิดรูปแทน', false);
-      window.open(viewerCurrentSrc, '_blank');
+      // Cross-origin fetch failed (e.g. CORS, or restrictions inside an in-app browser like LINE).
+      // Avoid window.open() here — inside LINE's in-app browser it triggers an
+      // "open external app" confirmation prompt. The image is already shown on
+      // screen in the viewer, so guide the person to save it via long-press instead.
+      showToast('ดาวน์โหลดอัตโนมัติไม่สำเร็จ กรุณากดค้างที่รูปภาพแล้วเลือก "บันทึกรูปภาพ" แทน', false);
     });
 }
 
