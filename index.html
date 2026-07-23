@@ -3,10 +3,14 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Travel Tracking System</title>
+<title>Travel Log System</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
@@ -108,6 +112,29 @@
   .entry-actions{display:flex; gap:8px; margin-top:10px;}
   .btn-pdf{flex:1; display:flex; align-items:center; justify-content:center; gap:6px; font-size:12px; font-weight:600; background:var(--rose); color:#fff; border:none; border-radius:8px; padding:8px 10px; cursor:pointer; font-family:inherit;}
   .btn-pdf-outline{flex:1; display:flex; align-items:center; justify-content:center; gap:6px; font-size:12px; font-weight:600; background:#fff; color:var(--rose); border:1.5px solid var(--rose); border-radius:8px; padding:8px 10px; cursor:pointer; font-family:inherit; margin-bottom:12px;}
+
+  /* ---- Multi-round draft list (form view) ---- */
+  .draft-round-item{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:9px 10px; border:1px solid var(--slate-200); border-radius:8px;
+    margin-bottom:6px; font-size:12px; background:var(--slate-100); color:var(--slate-700);
+  }
+  .draft-round-label{flex:1; min-width:0;}
+  .draft-round-btns{display:flex; gap:2px; flex-shrink:0;}
+  .draft-round-btns button{background:none; border:none; cursor:pointer; font-size:15px; padding:4px 6px; border-radius:6px;}
+  .draft-round-btns button:active{background:var(--slate-200);}
+  .round-badge{font-size:11px; color:var(--slate-500); font-family:'IBM Plex Mono',monospace; margin-bottom:10px;}
+
+  /* ---- Round detail expander (history view) ---- */
+  .round-item{border:1px solid var(--slate-200); border-radius:8px; margin-top:8px; overflow:hidden;}
+  .round-item summary{
+    padding:9px 10px; font-size:12px; font-weight:600; cursor:pointer;
+    background:var(--slate-100); color:var(--slate-700); list-style:none;
+  }
+  .round-item summary::-webkit-details-marker{display:none;}
+  .round-item summary::before{content:'▸ ';}
+  .round-item[open] summary::before{content:'▾ ';}
+  .round-body{padding:10px;}
 
   /* ---- Image lightbox viewer ---- */
   .viewer-overlay{
@@ -233,7 +260,7 @@
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="2.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
     </div>
     <div>
-      <h1>Audit Field Report</h1>
+      <h1>Travel Log System</h1>
       <p class="font-mono" id="currentUserTag">แบบฟอร์มออกตรวจสาขา</p>
     </div>
     <button class="logout-btn" onclick="logout()">ออกจากระบบ</button>
@@ -282,6 +309,7 @@
 
     <section class="card">
       <div class="sec-head"><span class="sec-num">02</span><span class="sec-title">ระบุสาขา</span></div>
+      <div class="round-badge">กำลังกรอกรอบที่ <b id="currentRoundNum">1</b> จากสูงสุด 10 รอบ</div>
       <div class="field">
         <label>Store No. / Store Name</label>
         <select id="storeSelect" onchange="onStoreSelect()">
@@ -299,6 +327,10 @@
           <option value="SOA ตรวจสาขา">SOA ตรวจสาขา</option>
           <option value="INV full stock count">INV full stock count</option>
         </select>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>วันที่ไป</label><input type="date" id="dateFrom"></div>
+        <div class="field"><label>วันที่กลับ</label><input type="date" id="dateTo"></div>
       </div>
     </section>
 
@@ -328,13 +360,16 @@
       </div>
     </section>
 
+    <button type="button" class="btn btn-outline" id="draftBtn" style="border-color:var(--emerald); color:var(--emerald); margin-bottom:10px;" onclick="saveDraftRound()">📝 บันทึกร่าง / เพิ่มรอบถัดไป</button>
+    <div id="draftRoundsList" style="margin-bottom:8px;"></div>
+
     <button class="btn btn-primary" id="saveBtn" onclick="saveEntry()" style="margin-bottom:28px;">💾 Save file to admin</button>
   </div>
 
   <!-- HISTORY VIEW -->
   <div id="historyView" class="hidden">
     <div class="hist-topbar">
-      <p>ข้อมูลนี้เก็บอยู่ในเบราว์เซอร์เครื่องนี้เท่านั้น</p>
+      <p>ข้อมูลนี้ Sync ผ่าน Firebase — Admin ทุกคนเห็นข้อมูลร่วมกัน</p>
       <div style="display:flex; gap:6px;">
         <button class="btn-mini" onclick="exportExcel(getEntries())">⬇ Excel</button>
         <button class="btn-mini" style="background:var(--rose);" onclick="exportPDF(getEntries())">🧾 PDF</button>
@@ -349,14 +384,94 @@
 /* ===== Store master data (embedded) ===== */
 const STORES = [{"no": "1", "name": "Lat Phrao", "format": "Classic A", "province": "กรุงเทพมหานคร"}, {"no": "2", "name": "Chaeng Watthana", "format": "Classic A", "province": "นนทบุรี"}, {"no": "3", "name": "Srinakarin", "format": "Classic A", "province": "สมุทรปราการ"}, {"no": "4", "name": "Bangbon", "format": "Classic A", "province": "กรุงเทพมหานคร"}, {"no": "5", "name": "Chon Buri", "format": "Classic A", "province": "ชลบุรี"}, {"no": "6", "name": "Chiang Mai", "format": "Classic A", "province": "เชียงใหม่"}, {"no": "7", "name": "Nakhon Ratchasima", "format": "Classic A", "province": "นครราชสีมา"}, {"no": "8", "name": "Rangsit", "format": "Classic A", "province": "ปทุมธานี"}, {"no": "9", "name": "Hat Yai", "format": "Classic A", "province": "สงขลา"}, {"no": "10", "name": "Udon Thani", "format": "Classic A", "province": "อุดรธานี"}, {"no": "11", "name": "Phitsanulok", "format": "Classic A", "province": "พิษณุโลก"}, {"no": "12", "name": "Khon Kaen", "format": "Classic A", "province": "ขอนแก่น"}, {"no": "13", "name": "Surat Thani", "format": "Classic A", "province": "สุราษฎร์ธานี"}, {"no": "14", "name": "Ubon Ratchathani", "format": "Classic A", "province": "อุบลราชธานี"}, {"no": "15", "name": "Rayong", "format": "Classic A", "province": "ระยอง"}, {"no": "16", "name": "Nakhon Sawan", "format": "Classic A", "province": "นครสวรรค์"}, {"no": "17", "name": "Charansanitwong", "format": "Classic A", "province": "กรุงเทพมหานคร"}, {"no": "18", "name": "Sathon", "format": "Classic A", "province": "กรุงเทพมหานคร"}, {"no": "19", "name": "Nakhon Pathom", "format": "Classic B", "province": "นครปฐม"}, {"no": "20", "name": "Surin", "format": "Classic B", "province": "สุรินทร์"}, {"no": "21", "name": "Samsen", "format": "ECO Plus B", "province": "กรุงเทพมหานคร"}, {"no": "22", "name": "Nakhon Si Thammarat", "format": "Classic C", "province": "นครศรีธรรมราช"}, {"no": "23", "name": "Chiang Rai", "format": "Classic C", "province": "เชียงราย"}, {"no": "24", "name": "Sakon Nakhon", "format": "Classic C", "province": "สกลนคร"}, {"no": "25", "name": "Suphan Buri", "format": "Classic C", "province": "สุพรรณบุรี"}, {"no": "26", "name": "Chanthaburi", "format": "Classic C", "province": "จันทบุรี"}, {"no": "27", "name": "Phuket", "format": "ECO Plus B", "province": "ภูเก็ต"}, {"no": "28", "name": "Roi Et", "format": "Classic C", "province": "ร้อยเอ็ด"}, {"no": "29", "name": "Trang", "format": "Classic C", "province": "ตรัง"}, {"no": "30", "name": "Sa Kaeo", "format": "Classic B", "province": "สระแก้ว"}, {"no": "31", "name": "Koh Samui", "format": "Food Service C", "province": "สุราษฎร์ธานี"}, {"no": "32", "name": "Buri Ram", "format": "Classic B", "province": "บุรีรัมย์"}, {"no": "33", "name": "Si Sa Ket", "format": "Classic B", "province": "ศรีสะเกษ"}, {"no": "34", "name": "Lamphun", "format": "Classic B", "province": "ลำพูน"}, {"no": "35", "name": "Krabi", "format": "ECO Plus C", "province": "กระบี่"}, {"no": "36", "name": "Phetchaburi", "format": "Classic B", "province": "เพชรบุรี"}, {"no": "37", "name": "Chaiyaphum", "format": "Classic B", "province": "ชัยภูมิ"}, {"no": "38", "name": "Saraburi", "format": "Classic B", "province": "สระบุรี"}, {"no": "39", "name": "Pranburi", "format": "Classic B", "province": "ประจวบคีรีขันธ์"}, {"no": "40", "name": "Chachoengsao", "format": "Classic B", "province": "ฉะเชิงเทรา"}, {"no": "41", "name": "Chiang Mai 2_Hang Dong", "format": "ECO Plus B", "province": "เชียงใหม่"}, {"no": "42", "name": "Ram Inthra", "format": "Classic B", "province": "กรุงเทพมหานคร"}, {"no": "43", "name": "Chumphon", "format": "Classic B", "province": "ชุมพร"}, {"no": "44", "name": "Pattaya", "format": "ECO Plus B", "province": "ชลบุรี"}, {"no": "45", "name": "Kamphaeng Phet", "format": "Classic B", "province": "กำแพงเพชร"}, {"no": "46", "name": "Kanchanaburi", "format": "Classic B", "province": "กาญจนบุรี"}, {"no": "47", "name": "Lop Buri", "format": "Classic B", "province": "ลพบุรี"}, {"no": "48", "name": "Nong Khai", "format": "Classic B", "province": "หนองคาย"}, {"no": "49", "name": "Ratchaburi", "format": "Classic B", "province": "ราชบุรี"}, {"no": "50", "name": "Mae Rim", "format": "Classic B", "province": "เชียงใหม่"}, {"no": "51", "name": "Ayutthaya", "format": "Classic B", "province": "พระนครศรีอยุธยา"}, {"no": "52", "name": "Lampang", "format": "Classic B", "province": "ลำปาง"}, {"no": "53", "name": "Hua Hin", "format": "Food Service C", "province": "ประจวบคีรีขันธ์"}, {"no": "54", "name": "Khlong Luang", "format": "Classic B", "province": "ปทุมธานี"}, {"no": "55", "name": "Loei", "format": "Classic B", "province": "เลย"}, {"no": "56", "name": "Phetchabun", "format": "Classic B", "province": "เพชรบูรณ์"}, {"no": "57", "name": "Bang Phli", "format": "Classic B", "province": "สมุทรปราการ"}, {"no": "58", "name": "Mukdahan", "format": "Classic B", "province": "มุกดาหาร"}, {"no": "59", "name": "Satun", "format": "Classic B", "province": "สตูล"}, {"no": "60", "name": "Trat", "format": "Classic B", "province": "ตราด"}, {"no": "61", "name": "Chum Phae", "format": "Classic B", "province": "ขอนแก่น"}, {"no": "62", "name": "Rawai", "format": "Food Service E", "province": "ภูเก็ต"}, {"no": "63", "name": "Nakhon Phanom", "format": "Classic B", "province": "นครพนม"}, {"no": "64", "name": "Koh Pha Ngan", "format": "Food Service E", "province": "สุราษฎร์ธานี"}, {"no": "65", "name": "Bueng Kan", "format": "Classic B", "province": "บึงกาฬ"}, {"no": "66", "name": "North Pattaya", "format": "Food Service D", "province": "ชลบุรี"}, {"no": "67", "name": "Mae Sai", "format": "Classic B", "province": "เชียงราย"}, {"no": "68", "name": "Salaya", "format": "Classic B", "province": "นครปฐม"}, {"no": "69", "name": "Phatthalung", "format": "Classic B", "province": "พัทลุง"}, {"no": "70", "name": "Sukhothai", "format": "Classic C", "province": "สุโขทัย"}, {"no": "71", "name": "Patong", "format": "Food Service E", "province": "ภูเก็ต"}, {"no": "72", "name": "Samut Sakhon", "format": "Classic B", "province": "สมุทรสาคร"}, {"no": "73", "name": "Mae Sot", "format": "Classic B", "province": "ตาก"}, {"no": "74", "name": "Pak Chong", "format": "ECO Plus B", "province": "นครราชสีมา"}, {"no": "75", "name": "Thalang", "format": "ECO Plus B", "province": "ภูเก็ต"}, {"no": "76", "name": "Ranong", "format": "Classic B", "province": "ระนอง"}, {"no": "77", "name": "Lamai", "format": "Food Service C", "province": "สุราษฎร์ธานี"}, {"no": "78", "name": "Kanlapaphruek", "format": "Food Service D", "province": "กรุงเทพมหานคร"}, {"no": "79", "name": "Yasothon", "format": "Classic B", "province": "ยโสธร"}, {"no": "80", "name": "Maha Sarakham", "format": "Classic B", "province": "มหาสารคาม"}, {"no": "81", "name": "Fang", "format": "Classic C", "province": "เชียงราย"}, {"no": "82", "name": "Nakhon Nayok", "format": "Classic B", "province": "นครนายก"}, {"no": "83", "name": "Nakhon In", "format": "ECO Plus B", "province": "นนทบุรี"}, {"no": "84", "name": "Ban Phe", "format": "Food Service D", "province": "ระยอง"}, {"no": "85", "name": "Thung Song", "format": "Classic B", "province": "นครศรีธรรมราช"}, {"no": "86", "name": "Srinakarin 2", "format": "Food Service D", "province": "กรุงเทพมหานคร"}, {"no": "87", "name": "Phayao", "format": "Classic B", "province": "พะเยา"}, {"no": "89", "name": "Phitsanulok 2", "format": "ECO Plus B", "province": "พิษณุโลก"}, {"no": "91", "name": "F-Talad Mueang Mai (M-St.6)", "format": "Frozen Shop", "province": "เชียงใหม่"}, {"no": "92", "name": "F-Udon Thani (M-St.10)", "format": "Frozen Shop", "province": "อุดรธานี"}, {"no": "93", "name": "F-Thung Song (M-St.85)", "format": "Frozen Shop", "province": "นครศรีธรรมราช"}, {"no": "94", "name": "F-Talad Yamo (M-St.102)", "format": "Frozen Shop", "province": "นครราชสีมา"}, {"no": "95", "name": "F-Si Racha (M-St.109)", "format": "Frozen Shop", "province": "ชลบุรี"}, {"no": "96", "name": "Town In Town", "format": "Food Shop", "province": "กรุงเทพมหานคร"}, {"no": "97", "name": "F-Thanon Chan", "format": "Frozen Shop", "province": "กรุงเทพมหานคร"}, {"no": "98", "name": "F-Talad Nana Charoen (M-St.08)", "format": "Frozen Shop", "province": "ปทุมธานี"}, {"no": "100", "name": "Phrae", "format": "Classic C", "province": "แพร่"}, {"no": "101", "name": "Koh Chang", "format": "Food Service E", "province": "ตราด"}, {"no": "102", "name": "Nakhon Ratchasima 2", "format": "ECO Plus B", "province": "นครราชสีมา"}, {"no": "103", "name": "Nan", "format": "Classic B", "province": "น่าน"}, {"no": "104", "name": "Ao Nang", "format": "Food Service E", "province": "กระบี่"}, {"no": "105", "name": "Karon", "format": "Food Service E", "province": "ภูเก็ต"}, {"no": "106", "name": "Warin Chamrap", "format": "Classic B", "province": "อุบลราชธานี"}, {"no": "107", "name": "Nong Bua Lam Phu", "format": "Classic B", "province": "หนองบัวลำภู"}, {"no": "108", "name": "Nong Chok", "format": "Classic C", "province": "กรุงเทพมหานคร"}, {"no": "109", "name": "Laem Chabang", "format": "Food Service C", "province": "ชลบุรี"}, {"no": "110", "name": "Prachuap Khiri Khan", "format": "Classic B", "province": "ประจวบคีรีขันธ์"}, {"no": "111", "name": "Phet Kasem", "format": "ECO Plus B", "province": "กรุงเทพมหานคร"}, {"no": "112", "name": "Bang Poo", "format": "Food Service E", "province": "สมุทรปราการ"}, {"no": "113", "name": "Wang Hin", "format": "Food Service E", "province": "กรุงเทพมหานคร"}, {"no": "114", "name": "Sing Buri", "format": "Classic B", "province": "สิงห์บุรี"}, {"no": "115", "name": "Bang Bua Thong", "format": "ECO Plus B", "province": "นนทบุรี"}, {"no": "116", "name": "Kalasin", "format": "Classic B", "province": "กาฬสินธุ์"}, {"no": "117", "name": "Udom Suk", "format": "Food Service E", "province": "กรุงเทพมหานคร"}, {"no": "118", "name": "Ramkhamhaeng (Sammakorn)", "format": "Food Service E", "province": "กรุงเทพมหานคร"}, {"no": "119", "name": "Phichit", "format": "Classic C", "province": "พิจิตร"}, {"no": "120", "name": "Pathum Thani", "format": "Classic B", "province": "ปทุมธานี"}, {"no": "121", "name": "Bodindecha", "format": "Food Service D", "province": "กรุงเทพมหานคร"}, {"no": "122", "name": "Pracha Uthit", "format": "Food Service E", "province": "กรุงเทพมหานคร"}, {"no": "123", "name": "Sukhumvit 71", "format": "Food Service E", "province": "กรุงเทพมหานคร"}, {"no": "124", "name": "Nawamin 70", "format": "Food Service D", "province": "กรุงเทพมหานคร"}, {"no": "125", "name": "Cha-am", "format": "Food Service D", "province": "เพชรบุรี"}, {"no": "126", "name": "On Nut", "format": "Food Service D", "province": "กรุงเทพมหานคร"}, {"no": "127", "name": "Suksawat", "format": "Food Service E", "province": "กรุงเทพมหานคร"}, {"no": "128", "name": "Kabin Buri", "format": "ECO Plus B", "province": "ปราจีนบุรี"}, {"no": "129", "name": "Lat Krabang", "format": "Food Service E", "province": "กรุงเทพมหานคร"}, {"no": "130", "name": "Na Thong Charoen", "format": "Food Service E", "province": "ปทุมธานี"}, {"no": "131", "name": "Bo Win", "format": "ECO Plus C", "province": "ระยอง"}, {"no": "132", "name": "Sattahip", "format": "ECO Plus C", "province": "ชลบุรี"}, {"no": "133", "name": "Ramkhamhaeng 24", "format": "Food Service C", "province": "กรุงเทพมหานคร"}, {"no": "134", "name": "Amata Nakorn", "format": "Food Service D", "province": "ชลบุรี"}, {"no": "135", "name": "Bang Kho Laem", "format": "Food Service E", "province": "กรุงเทพมหานคร"}, {"no": "136", "name": "Khon Kaen 2", "format": "Food Service D", "province": "ขอนแก่น"}, {"no": "137", "name": "Wongsakorn 2", "format": "Food Service D", "province": "กรุงเทพมหานคร"}, {"no": "138", "name": "Meng Jai", "format": "Food Service E", "province": "กรุงเทพมหานคร"}, {"no": "139", "name": "Sukhumvit 22", "format": "Food Service D", "province": "กรุงเทพมหานคร"}, {"no": "140", "name": "Chan Road", "format": "Food Service E", "province": "กรุงเทพมหานคร"}, {"no": "141", "name": "Lam Luk Ka", "format": "Food Service D", "province": "ปทุมธานี"}, {"no": "142", "name": "Phraeksa", "format": "Food Service E", "province": "สมุทรปราการ"}, {"no": "143", "name": "Pradit Manutham", "format": "Food Service C", "province": "กรุงเทพมหานคร"}, {"no": "144", "name": "Rungroj Market (Khlong 4)", "format": "Food Service E", "province": "ปทุมธานี"}, {"no": "145", "name": "Phongphet", "format": "Food Service E", "province": "กรุงเทพมหานคร"}, {"no": "146", "name": "Uttaradit", "format": "ECO Plus C", "province": "อุตรดิตถ์"}, {"no": "147", "name": "Mueang Thong", "format": "Food Service D", "province": "นนทบุรี"}, {"no": "148", "name": "Liap Khlong 2", "format": "Food Service E", "province": "กรุงเทพมหานคร"}, {"no": "149", "name": "Om Noi", "format": "Classic C", "province": "สมุทรสาคร"}, {"no": "150", "name": "Sanam Bin Nam", "format": "Food Service D", "province": "นนทบุรี"}, {"no": "151", "name": "Thep Rak", "format": "Food Service D", "province": "กรุงเทพมหานคร"}, {"no": "152", "name": "Samut Songkhram", "format": "ECO Plus C", "province": "สมุทรสงคราม"}, {"no": "153", "name": "Wiang Sa", "format": "ECO Plus C", "province": "สุราษฎร์ธานี"}, {"no": "154", "name": "Prachin Buri", "format": "ECO Plus C", "province": "ปราจีนบุรี"}, {"no": "155", "name": "Pinklao", "format": "Food Service D", "province": "กรุงเทพมหานคร"}, {"no": "156", "name": "Samut Prakan", "format": "ECO Plus C", "province": "สมุทรปราการ"}, {"no": "157", "name": "Nakhon Ratchasima 3 (Save One)", "format": "ECO Plus C", "province": "นครราชสีมา"}, {"no": "158", "name": "Nakhon Sawan 2 (Phrom Nimit)", "format": "ECO Plus C", "province": "นครสวรรค์"}, {"no": "159", "name": "Udon Thani 2 (Ban Lueam)", "format": "ECO Plus C", "province": "อุดรธานี"}, {"no": "160", "name": "Mahachai", "format": "ECO Plus C", "province": "สมุทรสาคร"}, {"no": "161", "name": "Khon Kaen 3 (Ban Non Muang)", "format": "ECO Plus C", "province": "ขอนแก่น"}, {"no": "162", "name": "Amata Nakorn 2", "format": "ECO Plus C", "province": "ชลบุรี"}, {"no": "163", "name": "Songkhla", "format": "ECO Plus C", "province": "สงขลา"}, {"no": "164", "name": "Chai Nat", "format": "ECO Plus C", "province": "ชัยนาท"}, {"no": "165", "name": "Si Ayutthaya Road", "format": "ECO Plus C", "province": "กรุงเทพมหานคร"}, {"no": "166", "name": "Rawai 2", "format": "ECO Plus C", "province": "ภูเก็ต"}, {"no": "167", "name": "Chiang Mai (Chom Thong)", "format": "ECO Plus C", "province": "เชียงใหม่"}, {"no": "168", "name": "Ban Bueng (Chon Buri)", "format": "ECO Plus C", "province": "ชลบุรี"}, {"no": "169", "name": "Phangnga", "format": "ECO Plus C", "province": "พังงา"}, {"no": "170", "name": "Amnat Charoen", "format": "ECO Plus C", "province": "อำนาจเจริญ"}, {"no": "171", "name": "Jo Ho (Nakhon Ratchasima)", "format": "ECO Plus C", "province": "นครราชสีมา"}, {"no": "172", "name": "Ban Phai", "format": "ECO Plus C", "province": "ขอนแก่น"}, {"no": "173", "name": "Hat Yai 2", "format": "Classic A", "province": "สงขลา"}, {"no": "174", "name": "Cherng Talay", "format": "Classic A", "province": "ภูเก็ต"}, {"no": "175", "name": "Happitat (Bangna)", "format": "Classic A", "province": "สมุทรปราการ"}, {"no": "176", "name": "Pha Ngan 2", "format": "Classic A", "province": "ภูเก็ต"}, {"no": "300", "name": "Talad Wongsakorn", "format": "Food Shop", "province": "กรุงเทพมหานคร"}, {"no": "301", "name": "Rama 4", "format": "Food Shop", "province": "กรุงเทพมหานคร"}, {"no": "302", "name": "Thonglor", "format": "Food Shop", "province": "กรุงเทพมหานคร"}, {"no": "303", "name": "Siri Mangkhalachan", "format": "Food Shop", "province": "เชียงใหม่"}, {"no": "350", "name": "Ram Inthra KM.4", "format": "Fresh@Makro", "province": "กรุงเทพมหานคร"}, {"no": "351", "name": "Sino Park", "format": "Fresh@Makro", "province": "สมุทรปราการ"}, {"no": "352", "name": "Phatthanakan", "format": "Fresh@Makro", "province": "กรุงเทพมหานคร"}, {"no": "500", "name": "F-Na Klua (M-St.66)", "format": "Frozen Shop", "province": "ชลบุรี"}, {"no": "528", "name": "Chaeng Watthana", "format": "Baker Mart", "province": "นนทบุรี"}];
 
-const STORAGE_KEY = 'audit_entries_v2';
+/* =====================================================================
+   FIREBASE SETUP — วางค่า config ของโปรเจกต์ Firebase ของคุณตรงนี้
+   (หาได้จาก Firebase Console > Project settings > General > Your apps > Web app)
+   ===================================================================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyC4HOnjIH76SZE9TaKrN_xs9at74pETkm0",
+  authDomain: "travel-log-system-497dc.firebaseapp.com",
+  projectId: "travel-log-system-497dc",
+  storageBucket: "travel-log-system-497dc.firebasestorage.app",
+  messagingSenderId: "880081406470",
+  appId: "1:880081406470:web:3ae67ab8ba2aea50b3d187"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const storage = firebase.storage();
+const auth = firebase.auth();
+const ENTRIES_COLLECTION = 'audit_entries';
+
+// sign in anonymously so Firestore/Storage security rules can require an authenticated caller;
+// saveEntry() awaits this before writing so early clicks don't fail silently.
+const firebaseAuthReady = auth.signInAnonymously().catch(function(err){
+  console.error('Firebase anonymous auth failed', err);
+  showToast('เชื่อมต่อระบบกลางไม่สำเร็จ กรุณาเช็คอินเทอร์เน็ต', false);
+});
+
+function dataUrlToBlob(dataUrl){
+  const arr = dataUrl.split(',');
+  const mimeMatch = arr[0].match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while(n--){ u8arr[n] = bstr.charCodeAt(n); }
+  return new Blob([u8arr], { type: mime });
+}
+
+/* ===== Cloudinary (unsigned upload) — replaces Firebase Storage for image hosting ===== */
+const CLOUDINARY_CLOUD_NAME = 'rypuhniv';
+const CLOUDINARY_UPLOAD_PRESET = 'Travel Log System';
+const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/' + CLOUDINARY_CLOUD_NAME + '/image/upload';
+
+function uploadToCloudinary(blob, publicId){
+  const formData = new FormData();
+  formData.append('file', blob);
+  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+  formData.append('public_id', publicId);
+  return fetch(CLOUDINARY_UPLOAD_URL, { method: 'POST', body: formData })
+    .then(function(res){
+      if(!res.ok){
+        return res.json().then(function(err){
+          throw new Error((err && err.error && err.error.message) || 'Cloudinary upload failed');
+        });
+      }
+      return res.json();
+    })
+    .then(function(data){ return data.secure_url; });
+}
+
+/* uploads any base64 (data:) images found in the rounds array to Cloudinary,
+   replacing them in-place with their public secure URL before saving to Firestore */
+function uploadRoundImages(entryId, rounds){
+  const uploads = [];
+  rounds.forEach(function(r, idx){
+    ['goImage','backImage'].forEach(function(field){
+      const val = r[field];
+      if(val && typeof val === 'string' && val.indexOf('data:') === 0){
+        const publicId = 'audit_photos/'+entryId+'/round'+idx+'_'+field;
+        uploads.push(
+          uploadToCloudinary(dataUrlToBlob(val), publicId)
+            .then(function(url){ r[field] = url; })
+        );
+      }
+    });
+  });
+  return Promise.all(uploads).then(function(){ return rounds; });
+}
+
 let goImageData = null, backImageData = null;
 let currentUserEmail = null;
+let draftRounds = [];       // rounds saved via "บันทึกร่าง / เพิ่มรอบถัดไป" for the current session
+let editingDraftIndex = null; // index into draftRounds currently being edited, or null
+const MAX_ROUNDS = 10;
 
 /* ===== Access control ===== */
 const ADMIN_EMAILS = [
   'inv_support1@cpaxtra.co.th',
-  'soa_admin1@cpaxtra.co.th'
+  'soa_admin1@cpaxtra.co.th',
+  'ntantiha@cpaxtra.co.th'
 ];
 const ALLOWED_EMAILS = ADMIN_EMAILS.concat([
   'inv1@cpaxtra.co.th','inv2@cpaxtra.co.th','inv3@cpaxtra.co.th','inv4@cpaxtra.co.th','inv5@cpaxtra.co.th',
@@ -367,7 +482,7 @@ const ALLOWED_EMAILS = ADMIN_EMAILS.concat([
   'soa6@cpaxtra.co.th','soa7@cpaxtra.co.th','soa8@cpaxtra.co.th','soa9@cpaxtra.co.th','soa10@cpaxtra.co.th',
   'soa11@cpaxtra.co.th','soa12@cpaxtra.co.th','soa13@cpaxtra.co.th','soa14@cpaxtra.co.th','soa15@cpaxtra.co.th',
   'soa16@cpaxtra.co.th','soa17@cpaxtra.co.th',
-  'ntantiha@cpaxtra.co.th','tsirimet@cpaxtra.co.th',
+  'tsirimet@cpaxtra.co.th',
   'soa_support1@cpaxtra.co.th','soa_support2@cpaxtra.co.th'
 ]);
 
@@ -391,7 +506,11 @@ function attemptLogin(){
   document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('appRoot').classList.remove('hidden');
   document.getElementById('currentUserTag').textContent = raw;
-  document.getElementById('tabHistBtn').classList.toggle('hidden', ADMIN_EMAILS.indexOf(email) === -1);
+  const isAdmin = ADMIN_EMAILS.indexOf(email) !== -1;
+  document.getElementById('tabHistBtn').classList.toggle('hidden', !isAdmin);
+  if(isAdmin){
+    startEntriesListener();
+  }
 }
 
 function logout(){
@@ -400,6 +519,8 @@ function logout(){
   document.getElementById('authError').classList.remove('show');
   document.getElementById('appRoot').classList.add('hidden');
   document.getElementById('loginScreen').classList.remove('hidden');
+  stopEntriesListener();
+  resetForm();
   switchView('form');
 }
 
@@ -439,12 +560,36 @@ function onStoreSelect(){
 function showModal(){ document.getElementById('notFoundModal').classList.remove('hidden'); }
 function closeModal(){ document.getElementById('notFoundModal').classList.add('hidden'); }
 
+/* ===== Entries now live in Firestore, mirrored into this in-memory cache ===== */
+let entriesCache = [];
+let entriesUnsub = null;
+
 function getEntries(){
-  try{ return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
-  catch(e){ return []; }
+  return entriesCache;
 }
-function setEntries(list){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+
+function startEntriesListener(){
+  if(entriesUnsub) return; // already listening
+  entriesUnsub = db.collection(ENTRIES_COLLECTION).orderBy('savedAt','desc')
+    .onSnapshot(function(snapshot){
+      entriesCache = snapshot.docs.map(function(doc){
+        const data = doc.data();
+        data.id = doc.id;
+        return data;
+      });
+      updateHistCount();
+      if(!document.getElementById('historyView').classList.contains('hidden')){
+        renderHistory();
+      }
+    }, function(err){
+      console.error('Firestore listen error', err);
+      showToast('โหลดข้อมูลประวัติจากระบบกลางไม่สำเร็จ', false);
+    });
+}
+
+function stopEntriesListener(){
+  if(entriesUnsub){ entriesUnsub(); entriesUnsub = null; }
+  entriesCache = [];
 }
 
 function switchView(view){
@@ -511,14 +656,30 @@ function fmtDate(ts){
   return d.toLocaleString('th-TH', {day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'});
 }
 
-function resetForm(){
-  ['fullName','nickname','phone','vehicleType','plate','goDistance','backDistance']
-    .forEach(function(id){ document.getElementById(id).value = ''; });
+function fmtDateOnly(d){
+  if(!d) return '';
+  const dt = new Date(d+'T00:00:00');
+  if(isNaN(dt.getTime())) return d;
+  return dt.toLocaleDateString('th-TH', {day:'2-digit', month:'short', year:'numeric'});
+}
+
+function fmtDateRange(from, to){
+  if(!from && !to) return '-';
+  if(from && to && from === to) return fmtDateOnly(from);
+  if(from && to) return fmtDateOnly(from) + ' – ' + fmtDateOnly(to);
+  return fmtDateOnly(from || to);
+}
+
+function resetRoundFields(){
   document.getElementById('storeSelect').value = '';
   document.getElementById('storeName').value = '';
   document.getElementById('storeFormat').value = '';
   document.getElementById('storeProvince').value = '';
   document.getElementById('taskType').selectedIndex = 0;
+  document.getElementById('dateFrom').value = '';
+  document.getElementById('dateTo').value = '';
+  document.getElementById('goDistance').value = '';
+  document.getElementById('backDistance').value = '';
   goImageData = null; backImageData = null;
   document.getElementById('goPreviewWrap').innerHTML = '📷<br>แตะเพื่อแนบภาพแผนที่';
   document.getElementById('backPreviewWrap').innerHTML = '📷<br>แตะเพื่อแนบภาพแผนที่';
@@ -526,56 +687,211 @@ function resetForm(){
   document.getElementById('backFile').value = '';
 }
 
-function saveEntry(){
-  const fullName = document.getElementById('fullName').value.trim();
-  const storeNo = document.getElementById('storeSelect').value;
-  if(!fullName || !storeNo){
-    showToast('กรุณากรอกชื่อ-สกุล และเลือกสาขา', false);
-    return;
-  }
-  const btn = document.getElementById('saveBtn');
-  btn.disabled = true;
+function resetForm(){
+  ['fullName','nickname','phone','vehicleType','plate']
+    .forEach(function(id){ document.getElementById(id).value = ''; });
+  resetRoundFields();
+  draftRounds = [];
+  editingDraftIndex = null;
+  const draftBtn = document.getElementById('draftBtn');
+  draftBtn.textContent = '📝 บันทึกร่าง / เพิ่มรอบถัดไป';
+  draftBtn.disabled = false;
+  renderDraftRoundsList();
+  updateRoundBadge();
+}
 
-  const entry = {
-    id: Date.now().toString(),
-    savedAt: Date.now(),
-    savedBy: currentUserEmail || '-',
-    fullName: fullName,
-    nickname: document.getElementById('nickname').value.trim(),
-    phone: document.getElementById('phone').value.trim(),
-    vehicleType: document.getElementById('vehicleType').value.trim(),
-    plate: document.getElementById('plate').value.trim(),
-    storeNo: storeNo,
+function buildCurrentRoundObject(){
+  return {
+    storeNo: document.getElementById('storeSelect').value,
     storeName: document.getElementById('storeName').value,
     storeFormat: document.getElementById('storeFormat').value,
     storeProvince: document.getElementById('storeProvince').value,
     taskType: document.getElementById('taskType').value,
+    dateFrom: document.getElementById('dateFrom').value,
+    dateTo: document.getElementById('dateTo').value,
     goDistance: document.getElementById('goDistance').value,
     backDistance: document.getElementById('backDistance').value,
     goImage: goImageData,
     backImage: backImageData
   };
+}
 
-  try{
-    const list = getEntries();
-    list.unshift(entry);
-    setEntries(list);
-    updateHistCount();
-    resetForm();
-    showToast('บันทึกข้อมูลลงเครื่องนี้เรียบร้อย');
-  }catch(e){
-    showToast('บันทึกไม่สำเร็จ (พื้นที่เก็บข้อมูลอาจเต็ม)', false);
-  }finally{
-    btn.disabled = false;
+function updateRoundBadge(){
+  const n = Math.min(draftRounds.length + 1, MAX_ROUNDS);
+  document.getElementById('currentRoundNum').textContent = n;
+  document.getElementById('draftBtn').disabled = (draftRounds.length >= MAX_ROUNDS && editingDraftIndex === null);
+}
+
+function saveDraftRound(){
+  const storeNo = document.getElementById('storeSelect').value;
+  if(!storeNo){
+    showToast('กรุณาเลือกสาขาก่อนบันทึกร่างรอบนี้', false);
+    return;
   }
+  const roundObj = buildCurrentRoundObject();
+
+  if(editingDraftIndex !== null){
+    draftRounds[editingDraftIndex] = roundObj;
+    editingDraftIndex = null;
+    document.getElementById('draftBtn').textContent = '📝 บันทึกร่าง / เพิ่มรอบถัดไป';
+    showToast('แก้ไขรอบเรียบร้อย');
+  } else {
+    if(draftRounds.length >= MAX_ROUNDS){
+      showToast('บันทึกร่างได้สูงสุด '+MAX_ROUNDS+' รอบต่อครั้ง', false);
+      return;
+    }
+    draftRounds.push(roundObj);
+    showToast('บันทึกร่างรอบที่ '+draftRounds.length+' แล้ว เพิ่มรอบถัดไปได้เลย');
+  }
+
+  resetRoundFields();
+  renderDraftRoundsList();
+  updateRoundBadge();
+}
+
+function editDraftRound(idx){
+  const r = draftRounds[idx];
+  if(!r) return;
+  document.getElementById('storeSelect').value = r.storeNo;
+  document.getElementById('storeName').value = r.storeName;
+  document.getElementById('storeFormat').value = r.storeFormat;
+  document.getElementById('storeProvince').value = r.storeProvince;
+  document.getElementById('taskType').value = r.taskType;
+  document.getElementById('dateFrom').value = r.dateFrom || '';
+  document.getElementById('dateTo').value = r.dateTo || '';
+  document.getElementById('goDistance').value = r.goDistance;
+  document.getElementById('backDistance').value = r.backDistance;
+  goImageData = r.goImage; backImageData = r.backImage;
+  document.getElementById('goPreviewWrap').innerHTML = r.goImage
+    ? ('<img src="'+r.goImage+'"><button type="button" class="photo-remove" onclick="removeImage(event,\'go\')">✕</button>')
+    : '📷<br>แตะเพื่อแนบภาพแผนที่';
+  document.getElementById('backPreviewWrap').innerHTML = r.backImage
+    ? ('<img src="'+r.backImage+'"><button type="button" class="photo-remove" onclick="removeImage(event,\'back\')">✕</button>')
+    : '📷<br>แตะเพื่อแนบภาพแผนที่';
+  editingDraftIndex = idx;
+  document.getElementById('draftBtn').textContent = '💾 บันทึกการแก้ไขรอบนี้';
+  document.getElementById('draftBtn').disabled = false;
+  window.scrollTo({top:0, behavior:'smooth'});
+  showToast('กำลังแก้ไขรอบที่ '+(idx+1));
+}
+
+function deleteDraftRound(idx){
+  draftRounds.splice(idx, 1);
+  if(editingDraftIndex === idx){
+    editingDraftIndex = null;
+    resetRoundFields();
+    document.getElementById('draftBtn').textContent = '📝 บันทึกร่าง / เพิ่มรอบถัดไป';
+  } else if(editingDraftIndex !== null && idx < editingDraftIndex){
+    editingDraftIndex--;
+  }
+  renderDraftRoundsList();
+  updateRoundBadge();
+  showToast('ลบรอบแล้ว');
+}
+
+function renderDraftRoundsList(){
+  const wrap = document.getElementById('draftRoundsList');
+  if(draftRounds.length === 0){ wrap.innerHTML = ''; return; }
+  wrap.innerHTML = draftRounds.map(function(r, idx){
+    return '<div class="draft-round-item">' +
+      '<span class="draft-round-label">รอบ '+(idx+1)+': '+escapeHtml(r.storeNo)+' - '+escapeHtml(r.storeName||'-')+' · '+escapeHtml(r.taskType||'-')+(r.dateFrom||r.dateTo? ' · '+fmtDateRange(r.dateFrom,r.dateTo) : '')+'</span>' +
+      '<span class="draft-round-btns">' +
+        '<button type="button" onclick="editDraftRound('+idx+')" title="แก้ไขรอบนี้">✏️</button>' +
+        '<button type="button" onclick="deleteDraftRound('+idx+')" title="ลบรอบนี้">🗑</button>' +
+      '</span>' +
+    '</div>';
+  }).join('');
+}
+
+function getRounds(entry){
+  if(entry.rounds && entry.rounds.length) return entry.rounds;
+  // legacy single-round entries saved before multi-round support
+  return [{
+    storeNo: entry.storeNo, storeName: entry.storeName, storeFormat: entry.storeFormat,
+    storeProvince: entry.storeProvince, taskType: entry.taskType,
+    dateFrom: entry.dateFrom, dateTo: entry.dateTo,
+    goDistance: entry.goDistance, backDistance: entry.backDistance,
+    goImage: entry.goImage, backImage: entry.backImage
+  }];
+}
+
+function saveEntry(){
+  const fullName = document.getElementById('fullName').value.trim();
+  if(!fullName){
+    showToast('กรุณากรอกชื่อ-สกุล', false);
+    return;
+  }
+
+  // clone drafted rounds so far
+  let finalRounds = draftRounds.map(function(r){ return Object.assign({}, r); });
+
+  // if there's a store selected in the form right now, fold it in as the final round
+  // (either replacing the draft currently being edited, or appended as one more round)
+  const storeNo = document.getElementById('storeSelect').value;
+  if(storeNo){
+    const currentRound = buildCurrentRoundObject();
+    if(editingDraftIndex !== null && editingDraftIndex < finalRounds.length){
+      finalRounds[editingDraftIndex] = currentRound;
+    } else {
+      finalRounds.push(currentRound);
+    }
+  }
+
+  if(finalRounds.length === 0){
+    showToast('กรุณากรอกข้อมูลอย่างน้อย 1 รอบ (เลือกสาขา)', false);
+    return;
+  }
+
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true;
+  showToast('กำลังอัปโหลดรูปและบันทึกข้อมูลขึ้น Firebase...');
+
+  const entryId = Date.now().toString();
+  const savedAt = Date.now();
+  const savedBy = currentUserEmail || '-';
+  const nickname = document.getElementById('nickname').value.trim();
+  const phone = document.getElementById('phone').value.trim();
+  const vehicleType = document.getElementById('vehicleType').value.trim();
+  const plate = document.getElementById('plate').value.trim();
+
+  firebaseAuthReady
+    .then(function(){ return uploadRoundImages(entryId, finalRounds); })
+    .then(function(uploadedRounds){
+      return db.collection(ENTRIES_COLLECTION).doc(entryId).set({
+        savedAt: savedAt,
+        savedBy: savedBy,
+        fullName: fullName,
+        nickname: nickname,
+        phone: phone,
+        vehicleType: vehicleType,
+        plate: plate,
+        rounds: uploadedRounds
+      });
+    })
+    .then(function(){
+      resetForm();
+      showToast('บันทึกข้อมูลขึ้น Firebase เรียบร้อย ('+finalRounds.length+' รอบ)');
+    })
+    .catch(function(err){
+      console.error('saveEntry failed', err);
+      showToast('บันทึกไม่สำเร็จ: '+(err && err.message ? err.message : 'เกิดข้อผิดพลาด'), false);
+    })
+    .finally(function(){
+      btn.disabled = false;
+    });
 }
 
 function deleteEntry(id){
-  const list = getEntries().filter(function(e){ return e.id !== id; });
-  setEntries(list);
-  renderHistory();
-  updateHistCount();
-  showToast('ลบรายการแล้ว');
+  if(!window.confirm('ยืนยันลบรายการนี้? ข้อมูลจะหายจาก Firebase ทันทีและกู้คืนไม่ได้')) return;
+  db.collection(ENTRIES_COLLECTION).doc(id).delete()
+    .then(function(){
+      showToast('ลบรายการแล้ว');
+      // entriesCache updates automatically via the onSnapshot listener
+    })
+    .catch(function(err){
+      console.error('deleteEntry failed', err);
+      showToast('ลบไม่สำเร็จ: '+(err && err.message ? err.message : 'เกิดข้อผิดพลาด'), false);
+    });
 }
 
 function updateHistCount(){
@@ -597,33 +913,48 @@ function renderHistory(){
     return;
   }
   container.innerHTML = list.map(function(e){
-    let imgsHtml = '';
-    if(e.goImage || e.backImage){
-      imgsHtml = '<div class="entry-imgs">' +
-        (e.goImage ? '<div class="img-slot"><img src="'+e.goImage+'" onclick="openImageViewer(\''+e.id+'\',\'go\')"><div class="img-cap">ขาไป</div></div>' : '') +
-        (e.backImage ? '<div class="img-slot"><img src="'+e.backImage+'" onclick="openImageViewer(\''+e.id+'\',\'back\')"><div class="img-cap">ขากลับ</div></div>' : '') +
-        '</div>';
-    }
+    const rounds = getRounds(e);
+
+    const roundsHtml = rounds.map(function(r, idx){
+      let imgsHtml = '';
+      if(r.goImage || r.backImage){
+        imgsHtml = '<div class="entry-imgs">' +
+          (r.goImage ? '<div class="img-slot"><img src="'+r.goImage+'" onclick="openImageViewer(\''+e.id+'\','+idx+',\'go\')"><div class="img-cap">ขาไป</div></div>' : '') +
+          (r.backImage ? '<div class="img-slot"><img src="'+r.backImage+'" onclick="openImageViewer(\''+e.id+'\','+idx+',\'back\')"><div class="img-cap">ขากลับ</div></div>' : '') +
+          '</div>';
+      }
+      return '<details class="round-item">' +
+        '<summary>รอบ '+(idx+1)+': '+escapeHtml(r.storeNo)+' - '+escapeHtml(r.storeName || '-')+' · '+escapeHtml(r.taskType||'-')+'</summary>' +
+        '<div class="round-body">' +
+          '<div class="entry-meta">' +
+            '<span>Format: '+escapeHtml(r.storeFormat||'-')+'</span>' +
+            '<span>จังหวัด: '+escapeHtml(r.storeProvince||'-')+'</span>' +
+            '<span>วันที่: '+fmtDateRange(r.dateFrom, r.dateTo)+'</span>' +
+            '<span>ขาไป: '+escapeHtml(r.goDistance||'-')+' กม.</span>' +
+            '<span>ขากลับ: '+escapeHtml(r.backDistance||'-')+' กม.</span>' +
+          '</div>' +
+          imgsHtml +
+        '</div>' +
+      '</details>';
+    }).join('');
+
     return '<div class="entry-card">' +
       '<div class="entry-top">' +
         '<div>' +
-          '<p class="entry-title">'+escapeHtml(e.storeNo)+' · '+escapeHtml(e.storeName || '-')+'</p>' +
-          '<p class="entry-date">'+fmtDate(e.savedAt)+' · '+escapeHtml(e.storeProvince||'')+'</p>' +
+          '<p class="entry-title">'+escapeHtml(e.fullName)+' ('+escapeHtml(e.nickname||'-')+') · '+rounds.length+' รอบ</p>' +
+          '<p class="entry-date">'+fmtDate(e.savedAt)+'</p>' +
           '<p class="entry-date" style="color:#2563eb">บันทึกโดย: '+escapeHtml(e.savedBy||'-')+'</p>' +
         '</div>' +
         '<button class="del-btn" onclick="deleteEntry(\''+e.id+'\')">🗑</button>' +
       '</div>' +
       '<div class="entry-meta">' +
-        '<span>ผู้ตรวจ: '+escapeHtml(e.fullName)+' ('+escapeHtml(e.nickname||'-')+')</span>' +
         '<span>โทร: '+escapeHtml(e.phone||'-')+'</span>' +
-        '<span>ประเภท: '+escapeHtml(e.taskType)+'</span>' +
-        '<span>Format: '+escapeHtml(e.storeFormat||'-')+'</span>' +
-        '<span>ขาไป: '+escapeHtml(e.goDistance||'-')+' กม.</span>' +
-        '<span>ขากลับ: '+escapeHtml(e.backDistance||'-')+' กม.</span>' +
+        '<span>ประเภทรถ: '+escapeHtml(e.vehicleType||'-')+'</span>' +
+        '<span>ทะเบียน: '+escapeHtml(e.plate||'-')+'</span>' +
       '</div>' +
-      imgsHtml +
+      roundsHtml +
       '<div class="entry-actions">' +
-        '<button class="btn-pdf" onclick="exportPDF([getEntries().find(function(x){return x.id===\''+e.id+'\';})])">🧾 Export PDF รายการนี้</button>' +
+        '<button class="btn-pdf" onclick="exportPDF([getEntries().find(function(x){return x.id===\''+e.id+'\';})])">🧾 Export PDF (รวม '+rounds.length+' รอบ)</button>' +
       '</div>' +
     '</div>';
   }).join('');
@@ -634,24 +965,36 @@ function exportExcel(rows){
     showToast('ไม่มีข้อมูลให้ export', false);
     return;
   }
-  const data = rows.map(function(e){
-    return {
-      'วันที่บันทึก': fmtDate(e.savedAt),
-      'บันทึกโดย (อีเมล)': e.savedBy,
-      'ชื่อ-สกุล': e.fullName,
-      'ชื่อเล่น': e.nickname,
-      'เบอร์โทร': e.phone,
-      'ประเภทรถ': e.vehicleType,
-      'ทะเบียนรถยนต์': e.plate,
-      'Store No.': e.storeNo,
-      'Store Name': e.storeName,
-      'Store Format': e.storeFormat,
-      'จังหวัด': e.storeProvince,
-      'ประเภทงาน': e.taskType,
-      'ระยะทางขาไป (กม.)': e.goDistance,
-      'ระยะทางขากลับ (กม.)': e.backDistance
-    };
+  const data = [];
+  rows.forEach(function(e){
+    if(!e) return;
+    const rounds = getRounds(e);
+    rounds.forEach(function(r, idx){
+      data.push({
+        'วันที่บันทึก': fmtDate(e.savedAt),
+        'บันทึกโดย (อีเมล)': e.savedBy,
+        'รอบที่': idx+1,
+        'ชื่อ-สกุล': e.fullName,
+        'ชื่อเล่น': e.nickname,
+        'เบอร์โทร': e.phone,
+        'ประเภทรถ': e.vehicleType,
+        'ทะเบียนรถยนต์': e.plate,
+        'Store No.': r.storeNo,
+        'Store Name': r.storeName,
+        'Store Format': r.storeFormat,
+        'จังหวัด': r.storeProvince,
+        'ประเภทงาน': r.taskType,
+        'วันที่ไป': fmtDateOnly(r.dateFrom),
+        'วันที่กลับ': fmtDateOnly(r.dateTo),
+        'ระยะทางขาไป (กม.)': r.goDistance,
+        'ระยะทางขากลับ (กม.)': r.backDistance
+      });
+    });
   });
+  if(data.length===0){
+    showToast('ไม่มีข้อมูลให้ export', false);
+    return;
+  }
   const ws = XLSX.utils.json_to_sheet(data);
   ws['!cols'] = Object.keys(data[0]).map(function(k){ return { wch: Math.max(14, k.length+2) }; });
   const wb = XLSX.utils.book_new();
@@ -663,13 +1006,15 @@ function exportExcel(rows){
 
 /* ===== Image lightbox viewer ===== */
 let viewerCurrentSrc = null, viewerCurrentName = 'photo.jpg';
-function openImageViewer(entryId, which){
+function openImageViewer(entryId, roundIdx, which){
   const entry = getEntries().find(function(x){ return x.id === entryId; });
   if(!entry) return;
-  const src = which === 'go' ? entry.goImage : entry.backImage;
+  const round = getRounds(entry)[roundIdx];
+  if(!round) return;
+  const src = which === 'go' ? round.goImage : round.backImage;
   if(!src) return;
   viewerCurrentSrc = src;
-  viewerCurrentName = escapeHtml(entry.storeNo||'store') + '-' + (which==='go'?'khaipai':'khaklab') + '.jpg';
+  viewerCurrentName = escapeHtml(round.storeNo||'store') + '-round'+(roundIdx+1)+'-' + (which==='go'?'khaipai':'khaklab') + '.jpg';
   document.getElementById('viewerImg').src = src;
   document.getElementById('imgViewer').classList.remove('hidden');
 }
@@ -679,34 +1024,57 @@ function closeImageViewer(){
 }
 function downloadViewerImage(){
   if(!viewerCurrentSrc) return;
-  const a = document.createElement('a');
-  a.href = viewerCurrentSrc;
-  a.download = viewerCurrentName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  // data: URIs (legacy local entries) can be downloaded directly;
+  // Firebase Storage URLs are cross-origin, so fetch+blob first (requires CORS set on the bucket)
+  if(viewerCurrentSrc.indexOf('data:') === 0){
+    const a = document.createElement('a');
+    a.href = viewerCurrentSrc;
+    a.download = viewerCurrentName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    return;
+  }
+  fetch(viewerCurrentSrc)
+    .then(function(res){ return res.blob(); })
+    .then(function(blob){
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = viewerCurrentName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    })
+    .catch(function(){
+      // CORS likely not configured on the Storage bucket yet — fall back to opening the image
+      showToast('ดาวน์โหลดโดยตรงไม่สำเร็จ (อาจยังไม่ได้ตั้งค่า CORS) กำลังเปิดรูปแทน', false);
+      window.open(viewerCurrentSrc, '_blank');
+    });
 }
 
 /* ===== PDF export (data + images), rendered via html2canvas for correct Thai text ===== */
-function buildEntryReportEl(e){
+function buildRoundReportEl(entry, round, roundNum, totalRounds){
   const wrap = document.createElement('div');
   wrap.style.cssText = 'width:760px;background:#fff;padding:28px;font-family:Inter,Tahoma,sans-serif;color:#1e293b;box-sizing:border-box;';
   const imgsHtml =
     '<div style="display:flex;gap:16px;margin-top:16px;">' +
-      (e.goImage ? '<div style="flex:1;"><div style="background:#334155;color:#fff;font-size:11px;font-weight:700;padding:6px 8px;border-radius:6px 6px 0 0;">ขาไป'+(e.goDistance? ' · '+escapeHtml(e.goDistance)+' กม.':'')+'</div><img src="'+e.goImage+'" style="width:100%;display:block;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 6px 6px;"></div>' : '') +
-      (e.backImage ? '<div style="flex:1;"><div style="background:#d97706;color:#fff;font-size:11px;font-weight:700;padding:6px 8px;border-radius:6px 6px 0 0;">ขากลับ'+(e.backDistance? ' · '+escapeHtml(e.backDistance)+' กม.':'')+'</div><img src="'+e.backImage+'" style="width:100%;display:block;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 6px 6px;"></div>' : '') +
+      (round.goImage ? '<div style="flex:1;"><div style="background:#334155;color:#fff;font-size:11px;font-weight:700;padding:6px 8px;border-radius:6px 6px 0 0;">ขาไป'+(round.goDistance? ' · '+escapeHtml(round.goDistance)+' กม.':'')+'</div><img src="'+round.goImage+'" style="width:100%;display:block;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 6px 6px;"></div>' : '') +
+      (round.backImage ? '<div style="flex:1;"><div style="background:#d97706;color:#fff;font-size:11px;font-weight:700;padding:6px 8px;border-radius:6px 6px 0 0;">ขากลับ'+(round.backDistance? ' · '+escapeHtml(round.backDistance)+' กม.':'')+'</div><img src="'+round.backImage+'" style="width:100%;display:block;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 6px 6px;"></div>' : '') +
     '</div>';
   wrap.innerHTML =
     '<div style="display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #0f172a;padding-bottom:12px;margin-bottom:16px;">' +
-      '<div><div style="font-size:20px;font-weight:700;letter-spacing:.02em;">Audit Field Report</div>' +
-      '<div style="font-size:11px;color:#64748b;margin-top:2px;">แบบฟอร์มออกตรวจสาขา</div></div>' +
-      '<div style="text-align:right;font-size:11px;color:#64748b;">'+fmtDate(e.savedAt)+'<br>บันทึกโดย: '+escapeHtml(e.savedBy||'-')+'</div>' +
+      '<div><div style="font-size:20px;font-weight:700;letter-spacing:.02em;">Travel Log System</div>' +
+      '<div style="font-size:11px;color:#64748b;margin-top:2px;">แบบฟอร์มออกตรวจสาขา'+(totalRounds>1? ' · รอบที่ '+roundNum+' / '+totalRounds : '')+'</div></div>' +
+      '<div style="text-align:right;font-size:11px;color:#64748b;">'+fmtDate(entry.savedAt)+'<br>บันทึกโดย: '+escapeHtml(entry.savedBy||'-')+'</div>' +
     '</div>' +
-    '<div style="font-size:17px;font-weight:700;margin-bottom:10px;">'+escapeHtml(e.storeNo)+' · '+escapeHtml(e.storeName||'-')+' <span style="font-weight:400;color:#64748b;font-size:13px;">('+escapeHtml(e.storeProvince||'-')+')</span></div>' +
+    '<div style="font-size:17px;font-weight:700;margin-bottom:10px;">'+escapeHtml(round.storeNo)+' · '+escapeHtml(round.storeName||'-')+' <span style="font-weight:400;color:#64748b;font-size:13px;">('+escapeHtml(round.storeProvince||'-')+')</span></div>' +
     '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
-      trow('ผู้ตรวจ', escapeHtml(e.fullName)+' ('+escapeHtml(e.nickname||'-')+')', 'เบอร์โทร', escapeHtml(e.phone||'-')) +
-      trow('ประเภทงาน', escapeHtml(e.taskType||'-'), 'Store Format', escapeHtml(e.storeFormat||'-')) +
-      trow('ประเภทรถ', escapeHtml(e.vehicleType||'-'), 'ทะเบียนรถ', escapeHtml(e.plate||'-')) +
+      trow('ผู้ตรวจ', escapeHtml(entry.fullName)+' ('+escapeHtml(entry.nickname||'-')+')', 'เบอร์โทร', escapeHtml(entry.phone||'-')) +
+      trow('ประเภทงาน', escapeHtml(round.taskType||'-'), 'Store Format', escapeHtml(round.storeFormat||'-')) +
+      trow('วันที่ปฏิบัติงาน', fmtDateRange(round.dateFrom, round.dateTo), 'ประเภทรถ', escapeHtml(entry.vehicleType||'-')) +
+      trow('ทะเบียนรถ', escapeHtml(entry.plate||'-'), '', '') +
     '</table>' +
     imgsHtml;
   function trow(l1,v1,l2,v2){
@@ -729,6 +1097,21 @@ function exportPDF(rows){
     showToast('โหลดไลบรารี PDF ไม่สำเร็จ ลองใหม่อีกครั้ง', false);
     return;
   }
+
+  // flatten entries -> one page per round, so a multi-round entry becomes a multi-page PDF
+  const pages = [];
+  rows.forEach(function(e){
+    if(!e) return;
+    const rounds = getRounds(e);
+    rounds.forEach(function(r, idx){
+      pages.push({ entry: e, round: r, roundNum: idx+1, totalRounds: rounds.length });
+    });
+  });
+  if(pages.length === 0){
+    showToast('ไม่มีข้อมูลให้ export', false);
+    return;
+  }
+
   showToast('กำลังสร้าง PDF โปรดรอสักครู่...');
   const holder = document.createElement('div');
   holder.style.cssText = 'position:fixed; left:-9999px; top:0; z-index:-1;';
@@ -740,9 +1123,9 @@ function exportPDF(rows){
   const pageH = pdf.internal.pageSize.getHeight();
 
   let chain = Promise.resolve();
-  rows.forEach(function(e, idx){
+  pages.forEach(function(p, idx){
     chain = chain.then(function(){
-      const el = buildEntryReportEl(e);
+      const el = buildRoundReportEl(p.entry, p.round, p.roundNum, p.totalRounds);
       holder.innerHTML = '';
       holder.appendChild(el);
       return html2canvas(el, { scale:2, useCORS:true, backgroundColor:'#ffffff' }).then(function(canvas){
@@ -750,9 +1133,8 @@ function exportPDF(rows){
         const imgW = pageW - 40;
         const imgH = imgW * canvas.height / canvas.width;
         if(idx > 0) pdf.addPage();
-        let y = 20;
         if(imgH <= pageH - 40){
-          pdf.addImage(imgData, 'JPEG', 20, y, imgW, imgH);
+          pdf.addImage(imgData, 'JPEG', 20, 20, imgW, imgH);
         } else {
           // scale down to fit one page height if a single report is unusually tall
           const scaledH = pageH - 40;
@@ -767,10 +1149,10 @@ function exportPDF(rows){
     document.body.removeChild(holder);
     const dateStr = new Date().toISOString().slice(0,10);
     const fname = rows.length===1
-      ? 'audit-report-'+(rows[0].storeNo||'store')+'-'+dateStr+'.pdf'
+      ? 'audit-report-'+(rows[0].fullName||'entry').replace(/\s+/g,'-')+'-'+dateStr+'.pdf'
       : 'audit-field-report-'+dateStr+'.pdf';
     pdf.save(fname);
-    showToast('Export PDF สำเร็จ');
+    showToast('Export PDF สำเร็จ ('+pages.length+' หน้า)');
   }).catch(function(err){
     document.body.removeChild(holder);
     showToast('สร้าง PDF ไม่สำเร็จ', false);
@@ -779,6 +1161,8 @@ function exportPDF(rows){
 
 initStoreDropdown();
 updateHistCount();
+updateRoundBadge();
+renderDraftRoundsList();
 </script>
 </body>
 </html>
