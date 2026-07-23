@@ -36,7 +36,13 @@
   .brand{display:flex; align-items:center; gap:10px;}
   .brand-badge{background:var(--amber); border-radius:8px; padding:7px; display:flex;}
   .brand h1{font-size:18px; margin:0; letter-spacing:.03em; text-transform:uppercase;}
-  .brand p{margin:0; font-size:11px; color:var(--slate-400);}
+  .brand p{margin:0; font-size:11px; color:var(--slate-400); display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
+  .role-badge{
+    font-family:'Oswald',sans-serif; font-size:10px; font-weight:600; letter-spacing:.04em;
+    text-transform:uppercase; padding:2px 8px; border-radius:999px; line-height:1.6;
+  }
+  .role-badge.role-admin{background:var(--amber); color:var(--navy);}
+  .role-badge.role-user{background:var(--slate-700); color:var(--slate-300);}
 
   .tabs{display:flex; margin-top:16px; background:var(--navy-soft); border-radius:10px; padding:4px; gap:4px;}
   .tab-btn{
@@ -261,7 +267,9 @@
     </div>
     <div>
       <h1>Audit Field Report</h1>
-      <p class="font-mono" id="currentUserTag">แบบฟอร์มออกตรวจสาขา</p>
+      <p class="font-mono" id="currentUserTag">แบบฟอร์มออกตรวจสาขา
+        <span id="roleBadge" class="role-badge hidden"></span>
+      </p>
     </div>
     <button class="logout-btn" onclick="logout()">ออกจากระบบ</button>
   </div>
@@ -512,6 +520,10 @@ function attemptLogin(){
   document.getElementById('currentUserTag').textContent = raw;
   const isAdmin = ADMIN_EMAILS.indexOf(email) !== -1;
   document.getElementById('tabHistBtn').classList.toggle('hidden', !isAdmin);
+  const roleBadge = document.getElementById('roleBadge');
+  roleBadge.textContent = isAdmin ? 'Admin' : 'User';
+  roleBadge.classList.remove('hidden', 'role-admin', 'role-user');
+  roleBadge.classList.add(isAdmin ? 'role-admin' : 'role-user');
   if(isAdmin){
     startEntriesListener();
   }
@@ -521,6 +533,7 @@ function logout(){
   currentUserEmail = null;
   document.getElementById('emailInput').value = '';
   document.getElementById('authError').classList.remove('show');
+  document.getElementById('roleBadge').classList.add('hidden');
   document.getElementById('appRoot').classList.add('hidden');
   document.getElementById('loginScreen').classList.remove('hidden');
   stopEntriesListener();
