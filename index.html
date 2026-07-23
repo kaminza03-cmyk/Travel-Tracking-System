@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Audit Field Report</title>
+<title>Travel Tracking System</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -277,7 +277,7 @@
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="2.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
     </div>
     <div>
-      <h1>Audit Field Report</h1>
+      <h1>Travel Tracking System</h1>
       <p class="font-mono" id="currentUserTag">แบบฟอร์มออกตรวจสาขา</p>
       <p id="roleBadge" class="role-badge hidden"><span class="role-dot"></span><span id="roleBadgeText"></span></p>
     </div>
@@ -313,26 +313,26 @@
   <div id="formView">
 
     <section class="card">
-      <div class="sec-head"><span class="sec-num">01</span><span class="sec-title">ข้อมูลส่วนตัว</span></div>
-      <div class="field"><label>ชื่อ-สกุล (ภาษาไทย)</label><input id="fullName" placeholder="เช่น สมชาย ใจดี"></div>
+      <div class="sec-head"><span class="sec-num">01</span><span class="sec-title">💻 ข้อมูลส่วนตัว</span></div>
+      <div class="field"><label>✍️ ชื่อ-สกุล (ภาษาไทย)</label><input id="fullName" placeholder="เช่น สมชาย ใจดี"></div>
       <div class="grid2">
-        <div class="field"><label>ชื่อเล่น</label><input id="nickname" placeholder="ชื่อเล่น"></div>
-        <div class="field"><label>เบอร์โทร</label><input id="phone" type="tel" placeholder="08X-XXX-XXXX"></div>
+        <div class="field"><label>✍️ ชื่อเล่น</label><input id="nickname" placeholder="ชื่อเล่น"></div>
+        <div class="field"><label>📱 เบอร์โทร</label><input id="phone" type="tel" placeholder="08X-XXX-XXXX"></div>
       </div>
       <div class="grid2">
-        <div class="field"><label>ประเภทรถ</label><input id="vehicleType" placeholder="เช่น รถยนต์ส่วนตัว"></div>
-        <div class="field"><label>ทะเบียนรถ</label><input id="plate" placeholder="กข 1234"></div>
+        <div class="field"><label>🚘 ประเภทรถ</label><input id="vehicleType" placeholder="เช่น รถยนต์ส่วนตัว"></div>
+        <div class="field"><label>🏷️ ทะเบียนรถ</label><input id="plate" placeholder="กข 1234"></div>
       </div>
     </section>
 
     <section class="card">
-      <div class="sec-head"><span class="sec-num">02</span><span class="sec-title">ระบุสาขา</span></div>
+      <div class="sec-head"><span class="sec-num">02</span><span class="sec-title">📌 ระบุสาขา</span></div>
       <div class="round-badge">กำลังกรอกรอบที่ <b id="currentRoundNum">1</b> จากสูงสุด 10 รอบ</div>
 
       <div class="field">
         <label>สาขาต้นทาง — Store No. / Store Name</label>
         <select id="storeSelect" onchange="onStoreSelect()">
-          <option value="">-- เลือกสาขาต้นทาง --</option>
+          <option value="">-- 🎯 เลือกสาขาต้นทาง --</option>
         </select>
       </div>
       <div class="grid2">
@@ -344,7 +344,7 @@
       <div class="field" style="margin-top:16px; padding-top:14px; border-top:1px dashed var(--slate-300);">
         <label>สาขาปลายทาง — Store No. / Store Name</label>
         <select id="destStoreSelect" onchange="onDestStoreSelect()">
-          <option value="">-- เลือกสาขาปลายทาง --</option>
+          <option value="">-- 🎯 เลือกสาขาปลายทาง --</option>
         </select>
       </div>
       <div class="grid2">
@@ -361,13 +361,13 @@
         </select>
       </div>
       <div class="grid2">
-        <div class="field"><label>วันที่ไป</label><input type="date" id="dateFrom"></div>
-        <div class="field"><label>วันที่กลับ</label><input type="date" id="dateTo"></div>
+        <div class="field"><label>📆 วันที่ไป</label><input type="date" id="dateFrom"></div>
+        <div class="field"><label>📆 วันที่กลับ</label><input type="date" id="dateTo"></div>
       </div>
     </section>
 
     <section class="card">
-      <div class="sec-head"><span class="sec-num">03</span><span class="sec-title">ภาพแผนที่ &amp; ระยะทาง</span></div>
+      <div class="sec-head"><span class="sec-num">03</span><span class="sec-title">🗺️ ภาพแผนที่ &amp; ระยะทาง</span></div>
       <div class="photo-row">
         <div class="photo-slot">
           <div class="photo-tag go">➡ ขาไป</div>
@@ -401,7 +401,7 @@
   <!-- HISTORY VIEW -->
   <div id="historyView" class="hidden">
     <div class="hist-topbar">
-      <p>ข้อมูลนี้ Sync ผ่าน Firebase — Admin ทุกคนเห็นข้อมูลร่วมกัน</p>
+      <p> Admin ทุกคนเห็นข้อมูลร่วมกัน</p>
       <div style="display:flex; gap:6px;">
         <button class="btn-mini" onclick="exportExcel(getEntries())">⬇ Excel</button>
         <button class="btn-mini" style="background:var(--rose);" onclick="exportPDF(getEntries())">🧾 PDF</button>
@@ -1048,7 +1048,7 @@ function renderHistory(){
           '<p class="entry-date">'+fmtDate(e.savedAt)+'</p>' +
           '<p class="entry-date" style="color:#2563eb">บันทึกโดย: '+escapeHtml(e.savedBy||'-')+'</p>' +
         '</div>' +
-        '<button class="del-btn" onclick="deleteEntry(\''+e.id+'\')">🗑</button>' +
+        '<button class="del-btn" onclick="deleteEntry(\''+e.id+'\')">🗑️</button>' +
       '</div>' +
       '<div class="entry-meta">' +
         '<span>โทร: '+escapeHtml(e.phone||'-')+'</span>' +
@@ -1172,7 +1172,7 @@ function buildRoundReportEl(entry, round, roundNum, totalRounds){
     '</div>';
   wrap.innerHTML =
     '<div style="display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #0f172a;padding-bottom:12px;margin-bottom:16px;">' +
-      '<div><div style="font-size:20px;font-weight:700;letter-spacing:.02em;">Audit Field Report</div>' +
+      '<div><div style="font-size:20px;font-weight:700;letter-spacing:.02em;">Travel Tracking System</div>' +
       '<div style="font-size:11px;color:#64748b;margin-top:2px;">แบบฟอร์มออกตรวจสาขา'+(totalRounds>1? ' · รอบที่ '+roundNum+' / '+totalRounds : '')+'</div></div>' +
       '<div style="text-align:right;font-size:11px;color:#64748b;">'+fmtDate(entry.savedAt)+'<br>บันทึกโดย: '+escapeHtml(entry.savedBy||'-')+'</div>' +
     '</div>' +
