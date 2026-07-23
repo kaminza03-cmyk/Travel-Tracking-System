@@ -196,6 +196,28 @@
     font-size:14px; font-weight:600; cursor:pointer; font-family:inherit;
   }
 
+  /* ---- Confirm (delete) modal ---- */
+  .confirm-box .icon{color:var(--rose);}
+  .confirm-btn-row{display:flex; gap:10px; justify-content:center;}
+  .confirm-btn-row button{padding:10px 18px; font-size:13px;}
+  .btn-cancel{background:var(--slate-200) !important; color:var(--slate-700) !important;}
+  .btn-confirm-danger{background:var(--rose) !important; color:#fff !important;}
+
+  /* ---- History multi-select ---- */
+  .hist-select-row{
+    display:flex; align-items:center; gap:8px; font-size:12px; color:var(--slate-600);
+    font-weight:600; user-select:none; cursor:pointer;
+  }
+  .hist-select-row input[type=checkbox], .entry-check input[type=checkbox]{
+    width:17px; height:17px; accent-color:var(--rose); cursor:pointer;
+  }
+  .entry-check{display:flex; align-items:flex-start; padding-top:2px;}
+  .btn-mini.btn-bulk-delete{
+    background:var(--rose); opacity:.4; pointer-events:none; transition:opacity .15s;
+  }
+  .btn-mini.btn-bulk-delete.active{opacity:1; pointer-events:auto;}
+  .entry-card.entry-selected{border-color:var(--rose); box-shadow:0 0 0 2px rgba(225,29,72,.15);}
+
   /* ---- Login screen ---- */
   #loginScreen{
     min-height:100vh; display:flex; justify-content:center; align-items:center;
@@ -300,6 +322,18 @@
   </div>
 </div>
 
+<div id="confirmModal" class="modal-overlay hidden">
+  <div class="modal-box confirm-box">
+    <div class="icon">🗑️</div>
+    <h3 id="confirmModalTitle">ยืนยันการลบ</h3>
+    <p id="confirmModalMsg">ข้อมูลจะหายทันทีและกู้คืนไม่ได้</p>
+    <div class="confirm-btn-row">
+      <button class="btn-cancel" onclick="closeConfirmModal()">ยกเลิก</button>
+      <button class="btn-confirm-danger" id="confirmModalOkBtn">ยืนยันลบ</button>
+    </div>
+  </div>
+</div>
+
 <div id="imgViewer" class="viewer-overlay hidden" onclick="if(event.target===this) closeImageViewer()">
   <div class="viewer-topbar">
     <button class="viewer-btn" onclick="closeImageViewer()">✕</button>
@@ -401,12 +435,17 @@
   <!-- HISTORY VIEW -->
   <div id="historyView" class="hidden">
     <div class="hist-topbar">
-      <p> Admin ทุกคนเห็นข้อมูลร่วมกัน</p>
+      <label class="hist-select-row">
+        <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this.checked)">
+        เลือกทั้งหมด
+      </label>
       <div style="display:flex; gap:6px;">
+        <button class="btn-mini btn-bulk-delete" id="bulkDeleteBtn" onclick="requestBulkDelete()">🗑️ ลบที่เลือก (<span id="selectedCount">0</span>)</button>
         <button class="btn-mini" onclick="exportExcel(getEntries())">⬇ Excel</button>
         <button class="btn-mini" style="background:var(--rose);" onclick="exportPDF(getEntries())">🧾 PDF</button>
       </div>
     </div>
+    <p style="font-size:11px;color:var(--slate-500);margin:2px 0 10px;"> Admin ทุกคนเห็นข้อมูลร่วมกัน</p>
     <div id="historyList"></div>
   </div>
 </main>
@@ -972,17 +1011,91 @@ function saveEntry(){
     });
 }
 
+/* ===== Custom confirm modal (replaces window.confirm) ===== */
+let _confirmModalCallback = null;
+function showConfirmModal(title, msg, onConfirm){
+  document.getElementById('confirmModalTitle').textContent = title;
+  document.getElementById('confirmModalMsg').textContent = msg;
+  _confirmModalCallback = onConfirm;
+  document.getElementById('confirmModal').classList.remove('hidden');
+}
+function closeConfirmModal(){
+  document.getElementById('confirmModal').classList.add('hidden');
+  _confirmModalCallback = null;
+}
+document.getElementById('confirmModalOkBtn').addEventListener('click', function(){
+  const cb = _confirmModalCallback;
+  closeConfirmModal();
+  if(cb) cb();
+});
+
+/* ===== History multi-select ===== */
+let selectedEntryIds = new Set();
+
+function toggleEntrySelect(id, checked){
+  if(checked) selectedEntryIds.add(id); else selectedEntryIds.delete(id);
+  const card = document.querySelector('.entry-card[data-entry-id="'+id+'"]');
+  if(card) card.classList.toggle('entry-selected', checked);
+  updateBulkDeleteUI();
+}
+
+function toggleSelectAll(checked){
+  const list = getEntries();
+  selectedEntryIds = new Set(checked ? list.map(function(e){ return e.id; }) : []);
+  renderHistory();
+  updateBulkDeleteUI();
+}
+
+function updateBulkDeleteUI(){
+  const list = getEntries();
+  document.getElementById('selectedCount').textContent = selectedEntryIds.size;
+  document.getElementById('bulkDeleteBtn').classList.toggle('active', selectedEntryIds.size > 0);
+  const allSelected = list.length > 0 && selectedEntryIds.size === list.length;
+  document.getElementById('selectAllCheckbox').checked = allSelected;
+}
+
+function requestBulkDelete(){
+  const n = selectedEntryIds.size;
+  if(n === 0) return;
+  showConfirmModal(
+    'ตรวจสอบ และ ยืนยันการลบ',
+    'ต้องการลบ '+n+' รายการที่เลือกไว้ใช่ไหม? ข้อมูลจะหายทันทีและกู้คืนไม่ได้',
+    function(){
+      const ids = Array.from(selectedEntryIds);
+      Promise.all(ids.map(function(id){
+        return db.collection(ENTRIES_COLLECTION).doc(id).delete();
+      }))
+      .then(function(){
+        showToast('ลบ '+ids.length+' รายการแล้ว');
+        selectedEntryIds = new Set();
+        updateBulkDeleteUI();
+      })
+      .catch(function(err){
+        console.error('bulk delete failed', err);
+        showToast('ลบไม่สำเร็จ: '+(err && err.message ? err.message : 'เกิดข้อผิดพลาด'), false);
+      });
+    }
+  );
+}
+
 function deleteEntry(id){
-  if(!window.confirm('ยืนยันลบรายการนี้? ข้อมูลจะหายจาก Firebase ทันทีและกู้คืนไม่ได้')) return;
-  db.collection(ENTRIES_COLLECTION).doc(id).delete()
-    .then(function(){
-      showToast('ลบรายการแล้ว');
-      // entriesCache updates automatically via the onSnapshot listener
-    })
-    .catch(function(err){
-      console.error('deleteEntry failed', err);
-      showToast('ลบไม่สำเร็จ: '+(err && err.message ? err.message : 'เกิดข้อผิดพลาด'), false);
-    });
+  showConfirmModal(
+    'ตรวจสอบ และ ยืนยันการลบ',
+    'ยืนยันลบรายการนี้? ข้อมูลจะหายทันทีและกู้คืนไม่ได้',
+    function(){
+      db.collection(ENTRIES_COLLECTION).doc(id).delete()
+        .then(function(){
+          showToast('ลบรายการแล้ว');
+          selectedEntryIds.delete(id);
+          updateBulkDeleteUI();
+          // entriesCache updates automatically via the onSnapshot listener
+        })
+        .catch(function(err){
+          console.error('deleteEntry failed', err);
+          showToast('ลบไม่สำเร็จ: '+(err && err.message ? err.message : 'เกิดข้อผิดพลาด'), false);
+        });
+    }
+  );
 }
 
 function updateHistCount(){
@@ -999,8 +1112,11 @@ function escapeHtml(str){
 function renderHistory(){
   const list = getEntries();
   const container = document.getElementById('historyList');
+  const validIds = new Set(list.map(function(e){ return e.id; }));
+  selectedEntryIds.forEach(function(id){ if(!validIds.has(id)) selectedEntryIds.delete(id); });
   if(list.length === 0){
     container.innerHTML = '<div class="empty-state">ยังไม่มีประวัติการบันทึก</div>';
+    updateBulkDeleteUI();
     return;
   }
   container.innerHTML = list.map(function(e){
@@ -1041,9 +1157,10 @@ function renderHistory(){
       '</details>';
     }).join('');
 
-    return '<div class="entry-card">' +
+    return '<div class="entry-card'+(selectedEntryIds.has(e.id)?' entry-selected':'')+'" data-entry-id="'+e.id+'">' +
       '<div class="entry-top">' +
-        '<div>' +
+        '<label class="entry-check"><input type="checkbox" onchange="toggleEntrySelect(\''+e.id+'\', this.checked)" '+(selectedEntryIds.has(e.id)?'checked':'')+'></label>' +
+        '<div style="flex:1;">' +
           '<p class="entry-title">'+escapeHtml(e.fullName)+' ('+escapeHtml(e.nickname||'-')+') · '+rounds.length+' รอบ</p>' +
           '<p class="entry-date">'+fmtDate(e.savedAt)+'</p>' +
           '<p class="entry-date" style="color:#2563eb">บันทึกโดย: '+escapeHtml(e.savedBy||'-')+'</p>' +
@@ -1061,6 +1178,7 @@ function renderHistory(){
       '</div>' +
     '</div>';
   }).join('');
+  updateBulkDeleteUI();
 }
 
 function exportExcel(rows){
