@@ -118,6 +118,13 @@
   .round-edit-block{border:1px dashed var(--slate-300); border-radius:8px; padding:10px; margin:10px 0;}
   .round-edit-title{font-weight:700; font-size:13px; margin-bottom:6px;}
   .btn-save-edit{background:#16a34a !important; color:#fff !important;}
+  .edit-photo-row{display:flex; gap:10px; margin-top:4px; margin-bottom:12px;}
+  .edit-photo-slot{flex:1; min-width:0; display:flex; flex-direction:column; gap:6px;}
+  .edit-photo-label{font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:var(--slate-500);}
+  .edit-photo-thumb{aspect-ratio:4/3; width:100%; border-radius:8px; border:1px solid var(--slate-300); background:var(--slate-100); overflow:hidden; display:flex; align-items:center; justify-content:center;}
+  .edit-photo-thumb img{width:100%; height:100%; object-fit:cover;}
+  .edit-photo-empty{font-size:11px; color:var(--slate-400); text-align:center; padding:8px;}
+  .btn-change-photo{font-size:11px; font-weight:600; background:#fff; border:1px solid var(--slate-300); border-radius:6px; padding:6px 8px; cursor:pointer; font-family:inherit; color:var(--slate-700);}
   .entry-meta{display:grid; grid-template-columns:1fr 1fr; gap:4px 12px; font-size:12px; color:var(--slate-600); margin-top:8px;}
   .entry-imgs{display:flex; gap:8px; margin-top:10px;}
   .entry-imgs img{width:50%; aspect-ratio:4/3; object-fit:cover; border-radius:8px; border:1px solid var(--slate-200); cursor:zoom-in;}
@@ -527,6 +534,26 @@ function uploadRoundImages(entryId, rounds){
       const val = r[field];
       if(val && typeof val === 'string' && val.indexOf('data:') === 0){
         const publicId = 'audit_photos/'+entryId+'/round'+idx+'_'+field;
+        uploads.push(
+          uploadToCloudinary(dataUrlToBlob(val), publicId)
+            .then(function(url){ r[field] = url; })
+        );
+      }
+    });
+  });
+  return Promise.all(uploads).then(function(){ return rounds; });
+}
+
+/* used when editing an existing entry: uploads any newly-selected (data:) images with a
+   fresh, unique public_id so the previously-uploaded photo they replace is left alone in
+   Cloudinary rather than being overwritten (per agreed no-auto-delete behavior) */
+function uploadEditedRoundImages(entryId, rounds){
+  const uploads = [];
+  rounds.forEach(function(r, idx){
+    ['goImage','backImage'].forEach(function(field){
+      const val = r[field];
+      if(val && typeof val === 'string' && val.indexOf('data:') === 0){
+        const publicId = 'audit_photos/'+entryId+'/round'+idx+'_'+field+'_edit'+Date.now();
         uploads.push(
           uploadToCloudinary(dataUrlToBlob(val), publicId)
             .then(function(url){ r[field] = url; })
@@ -1151,31 +1178,55 @@ function updateEditRoundStore(idx, which, storeNo){
   editBuffer.rounds[idx][provinceKey] = store ? store.province : '';
 }
 
+/* called when the person picks a new file via the "🔁 เปลี่ยนรูป" button in edit mode.
+   Only compresses + previews locally as a data: URL — the real Cloudinary upload
+   happens later in saveEditEntry(), only if "บันทึกการแก้ไข" is actually pressed. */
+function handleEditImageChange(idx, field, inputEl){
+  const file = inputEl.files[0];
+  if(!file || !editBuffer || !editBuffer.rounds[idx]) return;
+  const thumbId = (field === 'goImage' ? 'editGoThumb_' : 'editBackThumb_') + idx;
+  const thumbEl = document.getElementById(thumbId);
+  if(thumbEl) thumbEl.innerHTML = '⏳';
+  compressImage(file).then(function(dataUrl){
+    editBuffer.rounds[idx][field] = dataUrl;
+    renderHistory();
+  }).catch(function(){
+    showToast('แนบภาพไม่สำเร็จ ลองใหม่', false);
+    if(thumbEl) thumbEl.innerHTML = '⚠️';
+  });
+}
+
 function saveEditEntry(id){
   if(!editBuffer) return;
   if(!editBuffer.fullName.trim()){
     showToast('กรุณากรอกชื่อ-สกุล', false);
     return;
   }
-  const payload = {
-    fullName: editBuffer.fullName.trim(),
-    nickname: editBuffer.nickname.trim(),
-    phone: editBuffer.phone.trim(),
-    vehicleType: editBuffer.vehicleType.trim(),
-    plate: editBuffer.plate.trim(),
-    rounds: editBuffer.rounds
-  };
-  db.collection(ENTRIES_COLLECTION).doc(id).update(payload)
-    .then(function(){
-      showToast('บันทึกการแก้ไขแล้ว');
-      editingEntryId = null;
-      editBuffer = null;
-      // onSnapshot listener refreshes entriesCache + re-renders automatically
-    })
-    .catch(function(err){
-      console.error('saveEditEntry failed', err);
-      showToast('บันทึกการแก้ไขไม่สำเร็จ: '+(err && err.message ? err.message : 'เกิดข้อผิดพลาด'), false);
-    });
+
+  const hasPendingImages = editBuffer.rounds.some(function(r){
+    return (r.goImage && r.goImage.indexOf('data:') === 0) || (r.backImage && r.backImage.indexOf('data:') === 0);
+  });
+  if(hasPendingImages) showToast('กำลังอัปโหลดรูปที่เปลี่ยน...');
+
+  uploadEditedRoundImages(id, editBuffer.rounds).then(function(uploadedRounds){
+    const payload = {
+      fullName: editBuffer.fullName.trim(),
+      nickname: editBuffer.nickname.trim(),
+      phone: editBuffer.phone.trim(),
+      vehicleType: editBuffer.vehicleType.trim(),
+      plate: editBuffer.plate.trim(),
+      rounds: uploadedRounds
+    };
+    return db.collection(ENTRIES_COLLECTION).doc(id).update(payload);
+  }).then(function(){
+    showToast('บันทึกการแก้ไขแล้ว');
+    editingEntryId = null;
+    editBuffer = null;
+    // onSnapshot listener refreshes entriesCache + re-renders automatically
+  }).catch(function(err){
+    console.error('saveEditEntry failed', err);
+    showToast('บันทึกการแก้ไขไม่สำเร็จ: '+(err && err.message ? err.message : 'เกิดข้อผิดพลาด'), false);
+  });
 }
 
 function deleteEntry(id){
@@ -1276,6 +1327,20 @@ function renderHistory(){
             '<div class="field"><label>ระยะทางขาไป (กม.)</label><input value="'+escapeHtml(r.goDistance||'')+'" oninput="updateEditRoundField('+idx+',\'goDistance\',this.value)"></div>' +
             '<div class="field"><label>ระยะทางขากลับ (กม.)</label><input value="'+escapeHtml(r.backDistance||'')+'" oninput="updateEditRoundField('+idx+',\'backDistance\',this.value)"></div>' +
           '</div>' +
+          '<div class="edit-photo-row">' +
+            '<div class="edit-photo-slot">' +
+              '<div class="edit-photo-label">ขาไป</div>' +
+              '<div class="edit-photo-thumb" id="editGoThumb_'+idx+'">'+(r.goImage ? '<img src="'+r.goImage+'">' : '<div class="edit-photo-empty">ไม่มีรูป</div>')+'</div>' +
+              '<button type="button" class="btn-change-photo" onclick="document.getElementById(\'editGoFile_'+idx+'\').click()">🔁 เปลี่ยนรูป</button>' +
+              '<input type="file" id="editGoFile_'+idx+'" accept="image/*" class="hidden" onchange="handleEditImageChange('+idx+',\'goImage\',this)">' +
+            '</div>' +
+            '<div class="edit-photo-slot">' +
+              '<div class="edit-photo-label">ขากลับ</div>' +
+              '<div class="edit-photo-thumb" id="editBackThumb_'+idx+'">'+(r.backImage ? '<img src="'+r.backImage+'">' : '<div class="edit-photo-empty">ไม่มีรูป</div>')+'</div>' +
+              '<button type="button" class="btn-change-photo" onclick="document.getElementById(\'editBackFile_'+idx+'\').click()">🔁 เปลี่ยนรูป</button>' +
+              '<input type="file" id="editBackFile_'+idx+'" accept="image/*" class="hidden" onchange="handleEditImageChange('+idx+',\'backImage\',this)">' +
+            '</div>' +
+          '</div>' +
         '</div>';
       }).join('');
 
@@ -1291,7 +1356,7 @@ function renderHistory(){
           '<div class="field"><label>ทะเบียนรถ</label><input value="'+escapeHtml(b.plate)+'" oninput="updateEditField(\'plate\',this.value)"></div>' +
         '</div>' +
         roundsEditHtml +
-        '<p style="font-size:11px;color:var(--slate-500);margin:6px 0;">* รูปภาพแผนที่ไม่สามารถแก้ไขในโหมดนี้ได้ ถ้าต้องเปลี่ยนรูป ให้ลบรายการนี้แล้วบันทึกใหม่</p>' +
+        '<p style="font-size:11px;color:var(--slate-500);margin:6px 0;">* รูปใหม่จะอัปโหลดขึ้น Cloudinary จริงตอนกด "บันทึกการแก้ไข" เท่านั้น รูปเดิมที่ถูกแทนที่จะยังค้างอยู่ใน Cloudinary (ไม่ลบอัตโนมัติ)</p>' +
         '<div class="confirm-btn-row" style="margin-top:10px;">' +
           '<button class="btn-cancel" onclick="cancelEditEntry()">ยกเลิก</button>' +
           '<button class="btn-save-edit" onclick="saveEditEntry(\''+e.id+'\')">💾 บันทึกการแก้ไข</button>' +
