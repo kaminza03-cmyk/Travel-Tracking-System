@@ -406,7 +406,7 @@
         <div class="photo-slot">
           <div class="photo-tag go">➡ ขาไป</div>
           <div class="photo-drop" onclick="document.getElementById('goFile').click()">
-            <input type="file" id="goFile" accept="image/*" capture="environment" class="hidden" onchange="handleImage(event,'go')">
+            <input type="file" id="goFile" accept="image/*" class="hidden" onchange="handleImage(event,'go')">
             <div id="goPreviewWrap" class="photo-placeholder">📷<br>แตะเพื่อแนบภาพแผนที่</div>
           </div>
           <div class="dist-wrap">
@@ -416,7 +416,7 @@
         <div class="photo-slot">
           <div class="photo-tag back">➡ ขากลับ</div>
           <div class="photo-drop" onclick="document.getElementById('backFile').click()">
-            <input type="file" id="backFile" accept="image/*" capture="environment" class="hidden" onchange="handleImage(event,'back')">
+            <input type="file" id="backFile" accept="image/*" class="hidden" onchange="handleImage(event,'back')">
             <div id="backPreviewWrap" class="photo-placeholder">📷<br>แตะเพื่อแนบภาพแผนที่</div>
           </div>
           <div class="dist-wrap">
@@ -1058,8 +1058,8 @@ function requestBulkDelete(){
   const n = selectedEntryIds.size;
   if(n === 0) return;
   showConfirmModal(
-    'ตรวจสอบ และ ยืนยันการลบ',
-    'ต้องการลบ '+n+' รายการที่เลือกไว้ใช่ไหม? ข้อมูลจะหายทันทีและกู้คืนไม่ได้',
+    'ยืนยันการลบ',
+    'ต้องการลบ '+n+' รายการที่เลือกไว้ใช่ไหม? ข้อมูลจะหายจาก Firebase ทันทีและกู้คืนไม่ได้',
     function(){
       const ids = Array.from(selectedEntryIds);
       Promise.all(ids.map(function(id){
@@ -1080,8 +1080,8 @@ function requestBulkDelete(){
 
 function deleteEntry(id){
   showConfirmModal(
-    'ตรวจสอบ และ ยืนยันการลบ',
-    'ยืนยันลบรายการนี้? ข้อมูลจะหายทันทีและกู้คืนไม่ได้',
+    'ยืนยันการลบ',
+    'ยืนยันลบรายการนี้? ข้อมูลจะหายจาก Firebase ทันทีและกู้คืนไม่ได้',
     function(){
       db.collection(ENTRIES_COLLECTION).doc(id).delete()
         .then(function(){
