@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Travel Log System</title>
+<title>Audit Field Report</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -260,7 +260,7 @@
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="2.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
     </div>
     <div>
-      <h1>Travel Log System</h1>
+      <h1>Audit Field Report</h1>
       <p class="font-mono" id="currentUserTag">แบบฟอร์มออกตรวจสาขา</p>
     </div>
     <button class="logout-btn" onclick="logout()">ออกจากระบบ</button>
@@ -471,7 +471,11 @@ const MAX_ROUNDS = 10;
 const ADMIN_EMAILS = [
   'inv_support1@cpaxtra.co.th',
   'soa_admin1@cpaxtra.co.th',
-  'ntantiha@cpaxtra.co.th'
+  'ntantiha@cpaxtra.co.th',
+  'rsoa1@cpaxtra.co.th',
+  'rsoa2@cpaxtra.co.th',
+  'rsoa3@cpaxtra.co.th',
+  'rsoa4@cpaxtra.co.th'
 ];
 const ALLOWED_EMAILS = ADMIN_EMAILS.concat([
   'inv1@cpaxtra.co.th','inv2@cpaxtra.co.th','inv3@cpaxtra.co.th','inv4@cpaxtra.co.th','inv5@cpaxtra.co.th',
@@ -1065,7 +1069,7 @@ function buildRoundReportEl(entry, round, roundNum, totalRounds){
     '</div>';
   wrap.innerHTML =
     '<div style="display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #0f172a;padding-bottom:12px;margin-bottom:16px;">' +
-      '<div><div style="font-size:20px;font-weight:700;letter-spacing:.02em;">Travel Log System</div>' +
+      '<div><div style="font-size:20px;font-weight:700;letter-spacing:.02em;">Audit Field Report</div>' +
       '<div style="font-size:11px;color:#64748b;margin-top:2px;">แบบฟอร์มออกตรวจสาขา'+(totalRounds>1? ' · รอบที่ '+roundNum+' / '+totalRounds : '')+'</div></div>' +
       '<div style="text-align:right;font-size:11px;color:#64748b;">'+fmtDate(entry.savedAt)+'<br>บันทึกโดย: '+escapeHtml(entry.savedBy||'-')+'</div>' +
     '</div>' +
