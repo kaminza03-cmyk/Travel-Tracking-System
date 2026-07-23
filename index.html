@@ -145,6 +145,13 @@
   .round-item summary::before{content:'▸ ';}
   .round-item[open] summary::before{content:'▾ ';}
   .round-body{padding:10px;}
+  .round-trip-meta{
+    display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--slate-600);
+    margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed var(--slate-200);
+  }
+  .route-grid{display:grid; grid-template-columns:1fr 1fr; gap:4px 16px;}
+  .route-col{display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--slate-600); min-width:0;}
+  .route-col-label{font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:var(--slate-400); margin-bottom:2px;}
 
   /* ---- Image lightbox viewer ---- */
   .viewer-overlay{
@@ -321,10 +328,11 @@
     <section class="card">
       <div class="sec-head"><span class="sec-num">02</span><span class="sec-title">ระบุสาขา</span></div>
       <div class="round-badge">กำลังกรอกรอบที่ <b id="currentRoundNum">1</b> จากสูงสุด 10 รอบ</div>
+
       <div class="field">
-        <label>Store No. / Store Name</label>
+        <label>สาขาต้นทาง — Store No. / Store Name</label>
         <select id="storeSelect" onchange="onStoreSelect()">
-          <option value="">-- เลือกสาขา --</option>
+          <option value="">-- เลือกสาขาต้นทาง --</option>
         </select>
       </div>
       <div class="grid2">
@@ -332,6 +340,19 @@
         <div class="field"><label>Store Format</label><input id="storeFormat" disabled></div>
       </div>
       <div class="field"><label>จังหวัด</label><input id="storeProvince" disabled></div>
+
+      <div class="field" style="margin-top:16px; padding-top:14px; border-top:1px dashed var(--slate-300);">
+        <label>สาขาปลายทาง — Store No. / Store Name</label>
+        <select id="destStoreSelect" onchange="onDestStoreSelect()">
+          <option value="">-- เลือกสาขาปลายทาง --</option>
+        </select>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Store Name</label><input id="destStoreName" disabled></div>
+        <div class="field"><label>Store Format</label><input id="destStoreFormat" disabled></div>
+      </div>
+      <div class="field"><label>จังหวัด</label><input id="destStoreProvince" disabled></div>
+
       <div class="field">
         <label>ประเภทงานตรวจ</label>
         <select id="taskType">
@@ -546,12 +567,14 @@ function logout(){
 
 /* ---- populate store dropdown ---- */
 function initStoreDropdown(){
-  const sel = document.getElementById('storeSelect');
-  STORES.forEach(function(s){
-    const opt = document.createElement('option');
-    opt.value = s.no;
-    opt.textContent = s.no + ' - ' + s.name;
-    sel.appendChild(opt);
+  ['storeSelect','destStoreSelect'].forEach(function(id){
+    const sel = document.getElementById(id);
+    STORES.forEach(function(s){
+      const opt = document.createElement('option');
+      opt.value = s.no;
+      opt.textContent = s.no + ' - ' + s.name;
+      sel.appendChild(opt);
+    });
   });
 }
 
@@ -575,6 +598,28 @@ function onStoreSelect(){
   document.getElementById('storeName').value = store.name;
   document.getElementById('storeFormat').value = store.format;
   document.getElementById('storeProvince').value = store.province;
+}
+
+function onDestStoreSelect(){
+  const no = document.getElementById('destStoreSelect').value;
+  if(!no){
+    document.getElementById('destStoreName').value = '';
+    document.getElementById('destStoreFormat').value = '';
+    document.getElementById('destStoreProvince').value = '';
+    return;
+  }
+  const store = STORES.find(function(s){ return s.no === no; });
+  if(!store){
+    showModal();
+    document.getElementById('destStoreSelect').value = '';
+    document.getElementById('destStoreName').value = '';
+    document.getElementById('destStoreFormat').value = '';
+    document.getElementById('destStoreProvince').value = '';
+    return;
+  }
+  document.getElementById('destStoreName').value = store.name;
+  document.getElementById('destStoreFormat').value = store.format;
+  document.getElementById('destStoreProvince').value = store.province;
 }
 
 function showModal(){ document.getElementById('notFoundModal').classList.remove('hidden'); }
@@ -695,6 +740,10 @@ function resetRoundFields(){
   document.getElementById('storeName').value = '';
   document.getElementById('storeFormat').value = '';
   document.getElementById('storeProvince').value = '';
+  document.getElementById('destStoreSelect').value = '';
+  document.getElementById('destStoreName').value = '';
+  document.getElementById('destStoreFormat').value = '';
+  document.getElementById('destStoreProvince').value = '';
   document.getElementById('taskType').selectedIndex = 0;
   document.getElementById('dateFrom').value = '';
   document.getElementById('dateTo').value = '';
@@ -726,6 +775,10 @@ function buildCurrentRoundObject(){
     storeName: document.getElementById('storeName').value,
     storeFormat: document.getElementById('storeFormat').value,
     storeProvince: document.getElementById('storeProvince').value,
+    destStoreNo: document.getElementById('destStoreSelect').value,
+    destStoreName: document.getElementById('destStoreName').value,
+    destStoreFormat: document.getElementById('destStoreFormat').value,
+    destStoreProvince: document.getElementById('destStoreProvince').value,
     taskType: document.getElementById('taskType').value,
     dateFrom: document.getElementById('dateFrom').value,
     dateTo: document.getElementById('dateTo').value,
@@ -744,8 +797,13 @@ function updateRoundBadge(){
 
 function saveDraftRound(){
   const storeNo = document.getElementById('storeSelect').value;
+  const destStoreNo = document.getElementById('destStoreSelect').value;
   if(!storeNo){
-    showToast('กรุณาเลือกสาขาก่อนบันทึกร่างรอบนี้', false);
+    showToast('กรุณาเลือกสาขาต้นทางก่อนบันทึกร่างรอบนี้', false);
+    return;
+  }
+  if(!destStoreNo){
+    showToast('กรุณาเลือกสาขาปลายทางก่อนบันทึกร่างรอบนี้', false);
     return;
   }
   const roundObj = buildCurrentRoundObject();
@@ -776,6 +834,10 @@ function editDraftRound(idx){
   document.getElementById('storeName').value = r.storeName;
   document.getElementById('storeFormat').value = r.storeFormat;
   document.getElementById('storeProvince').value = r.storeProvince;
+  document.getElementById('destStoreSelect').value = r.destStoreNo || '';
+  document.getElementById('destStoreName').value = r.destStoreName || '';
+  document.getElementById('destStoreFormat').value = r.destStoreFormat || '';
+  document.getElementById('destStoreProvince').value = r.destStoreProvince || '';
   document.getElementById('taskType').value = r.taskType;
   document.getElementById('dateFrom').value = r.dateFrom || '';
   document.getElementById('dateTo').value = r.dateTo || '';
@@ -814,7 +876,7 @@ function renderDraftRoundsList(){
   if(draftRounds.length === 0){ wrap.innerHTML = ''; return; }
   wrap.innerHTML = draftRounds.map(function(r, idx){
     return '<div class="draft-round-item">' +
-      '<span class="draft-round-label">รอบ '+(idx+1)+': '+escapeHtml(r.storeNo)+' - '+escapeHtml(r.storeName||'-')+' · '+escapeHtml(r.taskType||'-')+(r.dateFrom||r.dateTo? ' · '+fmtDateRange(r.dateFrom,r.dateTo) : '')+'</span>' +
+      '<span class="draft-round-label">รอบ '+(idx+1)+': '+escapeHtml(r.storeNo)+' - '+escapeHtml(r.storeName||'-')+' &rarr; '+escapeHtml(r.destStoreNo||'-')+' - '+escapeHtml(r.destStoreName||'-')+' · '+escapeHtml(r.taskType||'-')+(r.dateFrom||r.dateTo? ' · '+fmtDateRange(r.dateFrom,r.dateTo) : '')+'</span>' +
       '<span class="draft-round-btns">' +
         '<button type="button" onclick="editDraftRound('+idx+')" title="แก้ไขรอบนี้">✏️</button>' +
         '<button type="button" onclick="deleteDraftRound('+idx+')" title="ลบรอบนี้">🗑</button>' +
@@ -848,7 +910,16 @@ function saveEntry(){
   // if there's a store selected in the form right now, fold it in as the final round
   // (either replacing the draft currently being edited, or appended as one more round)
   const storeNo = document.getElementById('storeSelect').value;
-  if(storeNo){
+  const destStoreNo = document.getElementById('destStoreSelect').value;
+  if(storeNo || destStoreNo){
+    if(!storeNo){
+      showToast('กรุณาเลือกสาขาต้นทาง', false);
+      return;
+    }
+    if(!destStoreNo){
+      showToast('กรุณาเลือกสาขาปลายทาง', false);
+      return;
+    }
     const currentRound = buildCurrentRoundObject();
     if(editingDraftIndex !== null && editingDraftIndex < finalRounds.length){
       finalRounds[editingDraftIndex] = currentRound;
@@ -858,7 +929,7 @@ function saveEntry(){
   }
 
   if(finalRounds.length === 0){
-    showToast('กรุณากรอกข้อมูลอย่างน้อย 1 รอบ (เลือกสาขา)', false);
+    showToast('กรุณากรอกข้อมูลอย่างน้อย 1 รอบ (เลือกสาขาต้นทางและปลายทาง)', false);
     return;
   }
 
@@ -944,14 +1015,26 @@ function renderHistory(){
           '</div>';
       }
       return '<details class="round-item">' +
-        '<summary>รอบ '+(idx+1)+': '+escapeHtml(r.storeNo)+' - '+escapeHtml(r.storeName || '-')+' · '+escapeHtml(r.taskType||'-')+'</summary>' +
+        '<summary>รอบ '+(idx+1)+': '+escapeHtml(r.storeNo)+' - '+escapeHtml(r.storeName || '-')+' &rarr; '+escapeHtml(r.destStoreNo||'-')+' - '+escapeHtml(r.destStoreName || '-')+' · '+escapeHtml(r.taskType||'-')+'</summary>' +
         '<div class="round-body">' +
-          '<div class="entry-meta">' +
-            '<span>Format: '+escapeHtml(r.storeFormat||'-')+'</span>' +
-            '<span>จังหวัด: '+escapeHtml(r.storeProvince||'-')+'</span>' +
+          '<div class="round-trip-meta">' +
             '<span>วันที่: '+fmtDateRange(r.dateFrom, r.dateTo)+'</span>' +
             '<span>ขาไป: '+escapeHtml(r.goDistance||'-')+' กม.</span>' +
             '<span>ขากลับ: '+escapeHtml(r.backDistance||'-')+' กม.</span>' +
+          '</div>' +
+          '<div class="route-grid">' +
+            '<div class="route-col">' +
+              '<div class="route-col-label">ต้นทาง</div>' +
+              '<span>สาขา: '+escapeHtml(r.storeNo)+' - '+escapeHtml(r.storeName||'-')+'</span>' +
+              '<span>Format: '+escapeHtml(r.storeFormat||'-')+'</span>' +
+              '<span>จังหวัด: '+escapeHtml(r.storeProvince||'-')+'</span>' +
+            '</div>' +
+            '<div class="route-col">' +
+              '<div class="route-col-label">ปลายทาง</div>' +
+              '<span>สาขา: '+escapeHtml(r.destStoreNo||'-')+' - '+escapeHtml(r.destStoreName||'-')+'</span>' +
+              '<span>Format: '+escapeHtml(r.destStoreFormat||'-')+'</span>' +
+              '<span>จังหวัด: '+escapeHtml(r.destStoreProvince||'-')+'</span>' +
+            '</div>' +
           '</div>' +
           imgsHtml +
         '</div>' +
@@ -999,10 +1082,14 @@ function exportExcel(rows){
         'เบอร์โทร': e.phone,
         'ประเภทรถ': e.vehicleType,
         'ทะเบียนรถยนต์': e.plate,
-        'Store No.': r.storeNo,
-        'Store Name': r.storeName,
-        'Store Format': r.storeFormat,
-        'จังหวัด': r.storeProvince,
+        'Store No. (ต้นทาง)': r.storeNo,
+        'Store Name (ต้นทาง)': r.storeName,
+        'Store Format (ต้นทาง)': r.storeFormat,
+        'จังหวัด (ต้นทาง)': r.storeProvince,
+        'Store No. (ปลายทาง)': r.destStoreNo,
+        'Store Name (ปลายทาง)': r.destStoreName,
+        'Store Format (ปลายทาง)': r.destStoreFormat,
+        'จังหวัด (ปลายทาง)': r.destStoreProvince,
         'ประเภทงาน': r.taskType,
         'วันที่ไป': fmtDateOnly(r.dateFrom),
         'วันที่กลับ': fmtDateOnly(r.dateTo),
@@ -1089,12 +1176,13 @@ function buildRoundReportEl(entry, round, roundNum, totalRounds){
       '<div style="font-size:11px;color:#64748b;margin-top:2px;">แบบฟอร์มออกตรวจสาขา'+(totalRounds>1? ' · รอบที่ '+roundNum+' / '+totalRounds : '')+'</div></div>' +
       '<div style="text-align:right;font-size:11px;color:#64748b;">'+fmtDate(entry.savedAt)+'<br>บันทึกโดย: '+escapeHtml(entry.savedBy||'-')+'</div>' +
     '</div>' +
-    '<div style="font-size:17px;font-weight:700;margin-bottom:10px;">'+escapeHtml(round.storeNo)+' · '+escapeHtml(round.storeName||'-')+' <span style="font-weight:400;color:#64748b;font-size:13px;">('+escapeHtml(round.storeProvince||'-')+')</span></div>' +
+    '<div style="font-size:17px;font-weight:700;margin-bottom:4px;">'+escapeHtml(round.storeNo)+' · '+escapeHtml(round.storeName||'-')+' <span style="font-weight:400;color:#64748b;font-size:13px;">('+escapeHtml(round.storeProvince||'-')+')</span> <span style="color:#94a3b8;">&rarr;</span> '+escapeHtml(round.destStoreNo||'-')+' · '+escapeHtml(round.destStoreName||'-')+' <span style="font-weight:400;color:#64748b;font-size:13px;">('+escapeHtml(round.destStoreProvince||'-')+')</span></div>' +
+    '<div style="font-size:11px;color:#94a3b8;margin-bottom:10px;">ต้นทาง &rarr; ปลายทาง</div>' +
     '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
       trow('ผู้ตรวจ', escapeHtml(entry.fullName)+' ('+escapeHtml(entry.nickname||'-')+')', 'เบอร์โทร', escapeHtml(entry.phone||'-')) +
-      trow('ประเภทงาน', escapeHtml(round.taskType||'-'), 'Store Format', escapeHtml(round.storeFormat||'-')) +
-      trow('วันที่ปฏิบัติงาน', fmtDateRange(round.dateFrom, round.dateTo), 'ประเภทรถ', escapeHtml(entry.vehicleType||'-')) +
-      trow('ทะเบียนรถ', escapeHtml(entry.plate||'-'), '', '') +
+      trow('ประเภทงาน', escapeHtml(round.taskType||'-'), 'วันที่ปฏิบัติงาน', fmtDateRange(round.dateFrom, round.dateTo)) +
+      trow('Store Format ต้นทาง', escapeHtml(round.storeFormat||'-'), 'Store Format ปลายทาง', escapeHtml(round.destStoreFormat||'-')) +
+      trow('ประเภทรถ', escapeHtml(entry.vehicleType||'-'), 'ทะเบียนรถ', escapeHtml(entry.plate||'-')) +
     '</table>' +
     imgsHtml;
   function trow(l1,v1,l2,v2){
