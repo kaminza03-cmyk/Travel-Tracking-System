@@ -1511,7 +1511,7 @@ function buildRoundReportEl(entry, round, roundNum, totalRounds){
     '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
       trow('ผู้ตรวจ', escapeHtml(entry.fullName)+' ('+escapeHtml(entry.nickname||'-')+')', 'เบอร์โทร', escapeHtml(entry.phone||'-')) +
       trow('ประเภทงาน', escapeHtml(round.taskType||'-'), 'วันที่ปฏิบัติงาน', fmtDateRange(round.dateFrom, round.dateTo)) +
-      trow('Store Format ต้นทาง', escapeHtml(round.storeFormat||'-'), 'Store Format ปลายทาง', escapeHtml(round.destStoreFormat||'-')) +
+      trow('ต้นทาง', escapeHtml(round.storeNo)+' - '+escapeHtml(round.storeName||'-')+' - '+escapeHtml(round.storeFormat||'-'), 'ปลายทาง', escapeHtml(round.destStoreNo||'-')+' - '+escapeHtml(round.destStoreName||'-')+' - '+escapeHtml(round.destStoreFormat||'-')) +
       trow('ประเภทรถ', escapeHtml(entry.vehicleType||'-'), 'ทะเบียนรถ', escapeHtml(entry.plate||'-')) +
     '</table>' +
     imgsHtml;
