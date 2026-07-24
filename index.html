@@ -451,6 +451,14 @@
 
   <!-- HISTORY VIEW -->
   <div id="historyView" class="hidden">
+    <div id="adminFilterRow" class="hidden" style="margin-bottom:12px;">
+      <div class="field" style="margin-bottom:0;">
+        <label>🔍 กรองตาม User Email (Admin เท่านั้น)</label>
+        <select id="adminEmailFilterSelect" onchange="setAdminEmailFilter(this.value)">
+          <option value="">-- แสดงทั้งหมด --</option>
+        </select>
+      </div>
+    </div>
     <div class="hist-topbar">
       <label class="hist-select-row">
         <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this.checked)">
@@ -572,6 +580,7 @@ function uploadEditedRoundImages(entryId, rounds){
 let goImageData = null, backImageData = null;
 let currentUserEmail = null;
 let currentUserIsAdmin = false;
+let adminEmailFilter = '';
 let draftRounds = [];       // rounds saved via "บันทึกร่าง / เพิ่มรอบถัดไป" for the current session
 let editingDraftIndex = null; // index into draftRounds currently being edited, or null
 const MAX_ROUNDS = 10;
@@ -626,7 +635,28 @@ function attemptLogin(){
   document.getElementById('roleBadgeText').textContent = isAdmin ? 'ADMIN' : 'USER';
   roleBadge.classList.remove('hidden', 'role-admin', 'role-user');
   roleBadge.classList.add(isAdmin ? 'role-admin' : 'role-user');
+  document.getElementById('adminFilterRow').classList.toggle('hidden', !isAdmin);
+  if(isAdmin){
+    populateAdminEmailFilter();
+  }
   startEntriesListener();
+}
+
+function populateAdminEmailFilter(){
+  const sel = document.getElementById('adminEmailFilterSelect');
+  if(sel.options.length > 1) return; // already populated
+  ALLOWED_EMAILS.slice().sort().forEach(function(em){
+    const opt = document.createElement('option');
+    opt.value = em;
+    opt.textContent = em;
+    sel.appendChild(opt);
+  });
+}
+
+function setAdminEmailFilter(value){
+  adminEmailFilter = value;
+  renderHistory();
+  updateHistCount();
 }
 
 function logout(){
@@ -634,6 +664,9 @@ function logout(){
   currentUserIsAdmin = false;
   editingEntryId = null;
   editBuffer = null;
+  adminEmailFilter = '';
+  document.getElementById('adminEmailFilterSelect').value = '';
+  document.getElementById('adminFilterRow').classList.add('hidden');
   document.getElementById('emailInput').value = '';
   document.getElementById('authError').classList.remove('show');
   document.getElementById('roleBadge').classList.add('hidden');
@@ -709,7 +742,15 @@ let entriesCache = [];
 let entriesUnsub = null;
 
 function getEntries(){
-  if(currentUserIsAdmin) return entriesCache;
+  if(currentUserIsAdmin){
+    if(adminEmailFilter){
+      const f = adminEmailFilter.toLowerCase();
+      return entriesCache.filter(function(e){
+        return (e.savedBy||'').toLowerCase() === f;
+      });
+    }
+    return entriesCache;
+  }
   const myEmail = (currentUserEmail||'').toLowerCase();
   return entriesCache.filter(function(e){
     return (e.savedBy||'').toLowerCase() === myEmail;
