@@ -401,10 +401,15 @@
 
       <div class="field">
         <label>ประเภทงานตรวจ</label>
-        <select id="taskType">
+        <select id="taskType" onchange="toggleTaskTypeOther()">
           <option value="SOA ตรวจสาขา">SOA ตรวจสาขา</option>
           <option value="INV full stock count">INV full stock count</option>
+          <option value="__other__">อื่นๆ (ระบุเอง)</option>
         </select>
+      </div>
+      <div class="field" id="taskTypeOtherWrap" style="display:none;">
+        <label>ระบุประเภทงาน</label>
+        <input id="taskTypeOther" placeholder="พิมพ์ประเภทงานที่ต้องการ">
       </div>
       <div class="grid2">
         <div class="field"><label>📆 วันที่ไป</label><input type="date" id="dateFrom"></div>
@@ -813,6 +818,18 @@ function fmtDateRange(from, to){
   return fmtDateOnly(from || to);
 }
 
+function toggleTaskTypeOther(){
+  const sel = document.getElementById('taskType');
+  const wrap = document.getElementById('taskTypeOtherWrap');
+  if(sel.value === '__other__'){
+    wrap.style.display = '';
+    document.getElementById('taskTypeOther').focus();
+  } else {
+    wrap.style.display = 'none';
+    document.getElementById('taskTypeOther').value = '';
+  }
+}
+
 function resetRoundFields(){
   document.getElementById('storeSelect').value = '';
   document.getElementById('storeName').value = '';
@@ -823,6 +840,8 @@ function resetRoundFields(){
   document.getElementById('destStoreFormat').value = '';
   document.getElementById('destStoreProvince').value = '';
   document.getElementById('taskType').selectedIndex = 0;
+  document.getElementById('taskTypeOther').value = '';
+  document.getElementById('taskTypeOtherWrap').style.display = 'none';
   document.getElementById('dateFrom').value = '';
   document.getElementById('dateTo').value = '';
   document.getElementById('goDistance').value = '';
@@ -857,7 +876,9 @@ function buildCurrentRoundObject(){
     destStoreName: document.getElementById('destStoreName').value,
     destStoreFormat: document.getElementById('destStoreFormat').value,
     destStoreProvince: document.getElementById('destStoreProvince').value,
-    taskType: document.getElementById('taskType').value,
+    taskType: document.getElementById('taskType').value === '__other__'
+      ? document.getElementById('taskTypeOther').value.trim()
+      : document.getElementById('taskType').value,
     dateFrom: document.getElementById('dateFrom').value,
     dateTo: document.getElementById('dateTo').value,
     goDistance: document.getElementById('goDistance').value,
@@ -916,7 +937,16 @@ function editDraftRound(idx){
   document.getElementById('destStoreName').value = r.destStoreName || '';
   document.getElementById('destStoreFormat').value = r.destStoreFormat || '';
   document.getElementById('destStoreProvince').value = r.destStoreProvince || '';
-  document.getElementById('taskType').value = r.taskType;
+  const fixedTaskTypes = ['SOA ตรวจสาขา','INV full stock count'];
+  if(r.taskType && fixedTaskTypes.indexOf(r.taskType) === -1){
+    document.getElementById('taskType').value = '__other__';
+    document.getElementById('taskTypeOther').value = r.taskType;
+    document.getElementById('taskTypeOtherWrap').style.display = '';
+  } else {
+    document.getElementById('taskType').value = r.taskType;
+    document.getElementById('taskTypeOther').value = '';
+    document.getElementById('taskTypeOtherWrap').style.display = 'none';
+  }
   document.getElementById('dateFrom').value = r.dateFrom || '';
   document.getElementById('dateTo').value = r.dateTo || '';
   document.getElementById('goDistance').value = r.goDistance;
@@ -1165,6 +1195,19 @@ function updateEditRoundField(idx, field, value){
   editBuffer.rounds[idx][field] = value;
 }
 
+function handleEditTaskTypeChange(idx, val){
+  const wrap = document.getElementById('editTaskTypeOtherWrap_'+idx);
+  if(val === '__other__'){
+    if(wrap) wrap.style.display = '';
+    updateEditRoundField(idx, 'taskType', '');
+    const inp = wrap ? wrap.querySelector('input') : null;
+    if(inp){ inp.value = ''; inp.focus(); }
+  } else {
+    if(wrap) wrap.style.display = 'none';
+    updateEditRoundField(idx, 'taskType', val);
+  }
+}
+
 function updateEditRoundStore(idx, which, storeNo){
   if(!editBuffer || !editBuffer.rounds[idx]) return;
   const store = STORES.find(function(s){ return s.no === storeNo; });
@@ -1315,10 +1358,15 @@ function renderHistory(){
           '<div class="round-edit-title">รอบ '+(idx+1)+'</div>' +
           '<div class="field"><label>สาขาต้นทาง</label><select onchange="updateEditRoundStore('+idx+',\'origin\',this.value)">'+buildStoreOptionsHtml(r.storeNo)+'</select></div>' +
           '<div class="field"><label>สาขาปลายทาง</label><select onchange="updateEditRoundStore('+idx+',\'dest\',this.value)">'+buildStoreOptionsHtml(r.destStoreNo)+'</select></div>' +
-          '<div class="field"><label>ประเภทงานตรวจ</label><select onchange="updateEditRoundField('+idx+',\'taskType\',this.value)">' +
+          '<div class="field"><label>ประเภทงานตรวจ</label><select id="editTaskTypeSel_'+idx+'" onchange="handleEditTaskTypeChange('+idx+',this.value)">' +
             '<option value="SOA ตรวจสาขา"'+(r.taskType==='SOA ตรวจสาขา'?' selected':'')+'>SOA ตรวจสาขา</option>' +
             '<option value="INV full stock count"'+(r.taskType==='INV full stock count'?' selected':'')+'>INV full stock count</option>' +
+            '<option value="__other__"'+(r.taskType && r.taskType!=='SOA ตรวจสาขา' && r.taskType!=='INV full stock count'?' selected':'')+'>อื่นๆ (ระบุเอง)</option>' +
           '</select></div>' +
+          '<div class="field" id="editTaskTypeOtherWrap_'+idx+'" style="'+(r.taskType && r.taskType!=='SOA ตรวจสาขา' && r.taskType!=='INV full stock count' ? '' : 'display:none;')+'">' +
+            '<label>ระบุประเภทงาน</label>' +
+            '<input value="'+escapeHtml(r.taskType && r.taskType!=='SOA ตรวจสาขา' && r.taskType!=='INV full stock count' ? r.taskType : '')+'" oninput="updateEditRoundField('+idx+',\'taskType\',this.value)">' +
+          '</div>' +
           '<div class="grid2">' +
             '<div class="field"><label>วันที่ไป</label><input type="date" value="'+escapeHtml(r.dateFrom||'')+'" onchange="updateEditRoundField('+idx+',\'dateFrom\',this.value)"></div>' +
             '<div class="field"><label>วันที่กลับ</label><input type="date" value="'+escapeHtml(r.dateTo||'')+'" onchange="updateEditRoundField('+idx+',\'dateTo\',this.value)"></div>' +
