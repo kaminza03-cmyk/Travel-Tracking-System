@@ -644,13 +644,50 @@ function attemptLogin(){
 
 function populateAdminEmailFilter(){
   const sel = document.getElementById('adminEmailFilterSelect');
-  if(sel.options.length > 1) return; // already populated
-  ALLOWED_EMAILS.slice().sort().forEach(function(em){
+  const counts = {};
+  entriesCache.forEach(function(e){
+    const em = (e.savedBy||'').trim();
+    if(!em) return;
+    counts[em] = (counts[em]||0) + 1;
+  });
+  const emails = Object.keys(counts).sort(function(a,b){
+    return a.toLowerCase().localeCompare(b.toLowerCase());
+  });
+
+  const prevValue = sel.value;
+  sel.innerHTML = '';
+
+  if(emails.length === 0){
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = '-- ยังไม่มี User Email กรอกข้อมูลเข้ามา --';
+    sel.appendChild(opt);
+    sel.disabled = true;
+    adminEmailFilter = '';
+    return;
+  }
+
+  sel.disabled = false;
+  const allOpt = document.createElement('option');
+  allOpt.value = '';
+  allOpt.textContent = '-- แสดงทั้งหมด --';
+  sel.appendChild(allOpt);
+
+  emails.forEach(function(em){
     const opt = document.createElement('option');
     opt.value = em;
-    opt.textContent = em;
+    opt.textContent = em + ' (' + counts[em] + ' รายการ)';
     sel.appendChild(opt);
   });
+
+  // keep the previously selected email if it still has data, otherwise fall back to "all"
+  if(prevValue && counts[prevValue]){
+    sel.value = prevValue;
+    adminEmailFilter = prevValue;
+  } else {
+    sel.value = '';
+    adminEmailFilter = '';
+  }
 }
 
 function setAdminEmailFilter(value){
@@ -766,6 +803,7 @@ function startEntriesListener(){
         data.id = doc.id;
         return data;
       });
+      if(currentUserIsAdmin) populateAdminEmailFilter();
       updateHistCount();
       if(!document.getElementById('historyView').classList.contains('hidden')){
         renderHistory();
